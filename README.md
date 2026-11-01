@@ -26,7 +26,7 @@ Ten rules ship by default, each tagged with its MITRE ATT&CK technique:
 | `web-scanner-404` | medium | 20+ `404`s from one IP in 60 s (directory brute-forcing) |
 | `web-sensitive-file-probe` | medium | repeated requests for `/.env`, `/.git/`, `/wp-login.php`, ... |
 | `web-path-traversal` | high | `../`, `/etc/passwd` in a request |
-| `web-sqli-probe` | high | `union select`, `or 1=1`, `sleep(` in a request |
+| `web-sqli-probe` | high | `union select` (also with SQL comments), `or 1=1`, `sleep(` in a request |
 | `web-scanner-user-agent` | medium | sqlmap, nikto, nmap, ... user agents |
 
 Adding your own takes a few lines of YAML: see [docs/writing-rules.md](docs/writing-rules.md).
@@ -91,7 +91,8 @@ machine that wrote the logs.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest                      # SQLite by default; TEST_DATABASE_URL=postgresql+psycopg://... for PostgreSQL
+pytest --cov                # tests and coverage; SQLite by default,
+                            # TEST_DATABASE_URL=postgresql+psycopg://... for PostgreSQL
 ruff check .
 minisiem rules check        # validate rules
 minisiem serve              # SQLite file by default; http://127.0.0.1:8000

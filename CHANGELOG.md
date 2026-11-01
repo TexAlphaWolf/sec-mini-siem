@@ -9,6 +9,10 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - CI job that runs the whole test suite against PostgreSQL 16, next to the SQLite matrix
 - `TEST_DATABASE_URL` setting to run the tests on any database
+- Detection-as-code tests: every rule has log lines that must fire it and benign ones that must
+  not, and CI fails if a rule has no tests
+- Coverage reporting in CI, with a minimum of 85%
+- Dependabot no longer proposes major or minor Python upgrades of the Docker image
 - Security policy, Dependabot updates, CodeQL analysis and a `pip-audit` job in CI
 - Container hardening in `docker-compose.yml`: read-only filesystem, no Linux capabilities,
   `no-new-privileges`
@@ -17,6 +21,8 @@ All notable changes to this project are documented here. The format follows
 - GitHub Actions updated to versions that run on Node.js 24
 
 ### Fixed
+- `web-sqli-probe` now catches comment-based evasion (`UNION/**/SELECT`) and no longer fires on
+  ordinary text such as "credit union selection" or "color 1=1"
 - A log line containing a NUL byte made PostgreSQL reject the whole batch, which could be abused
   to evade logging. NUL bytes are now stored as the visible text `\x00`.
 

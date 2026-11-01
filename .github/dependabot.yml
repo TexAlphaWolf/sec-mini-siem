@@ -13,3 +13,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Move the Python version by hand, after testing it in CI.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

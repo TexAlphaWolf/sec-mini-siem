@@ -1,16 +1,16 @@
 id: web-sqli-probe
 title: SQL injection probe
-description: A request contains common SQL injection payloads. The path is URL-decoded before matching.
+description: A request contains common SQL injection payloads. The path is URL-decoded before matching, SQL comments used instead of spaces (UNION/**/SELECT) are caught, and word boundaries avoid matching ordinary text such as "credit union selection".
 severity: high
 tags: [attack.initial_access, attack.t1190]
 match:
   event_type: http_request
-  path_decoded|contains:
-    - union select
-    - or 1=1
-    - information_schema
-    - sleep(
-    - benchmark(
+  path_decoded|re:
+    - 'union(\s|/\*.*?\*/)+(all(\s|/\*.*?\*/)+)?select\b'
+    - '\bor\s+1\s*=\s*1\b'
+    - 'information_schema'
+    - '\bsleep\s*\('
+    - '\bbenchmark\s*\('
 # One alert per source IP per 5 minutes: injection tools send hundreds of payloads.
 threshold:
   count: 1
