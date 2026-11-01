@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- CI job that runs the whole test suite against PostgreSQL 16, next to the SQLite matrix
+- `TEST_DATABASE_URL` setting to run the tests on any database
+
+### Fixed
+- A log line containing a NUL byte made PostgreSQL reject the whole batch, which could be abused
+  to evade logging. NUL bytes are now stored as the visible text `\x00`.
+
 ## [0.1.0] - 2026-11-01
 
 ### Added
@@ -16,4 +26,4 @@ All notable changes to this project are documented here. The format follows
 - Dependency-free dashboard that never renders log data as HTML
 - Command line interface: `serve`, `ingest` (with `--follow`) and `rules check`
 - Docker Compose setup with PostgreSQL and a configurable host port
-- Anonymised sample logs, a 48-test suite and CI on GitHub Actions
+- Anonymised sample logs, a test suite and CI on GitHub Actions

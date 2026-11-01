@@ -19,15 +19,16 @@ def test_rules_check_reports_errors(tmp_path, capsys):
     assert "invalid severity" in capsys.readouterr().err
 
 
-def test_ingest_file_writes_alerts_to_the_database(tmp_path, rules_dir, sample_dir, monkeypatch, capsys):
-    db = tmp_path / "cli.db"
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+def test_ingest_file_writes_alerts_to_the_database(
+    database_url, rules_dir, sample_dir, monkeypatch, capsys
+):
+    monkeypatch.setenv("DATABASE_URL", database_url)
     monkeypatch.setenv("MINISIEM_RULES_DIR", str(rules_dir))
 
     assert main(["ingest", "auth", str(sample_dir / "auth.log"), "--year", "2026"]) == 0
     assert "alerts=" in capsys.readouterr().out
 
-    _, session_factory = make_session_factory(f"sqlite:///{db}")
+    _, session_factory = make_session_factory(database_url)
     with session_factory() as session:
         assert session.scalar(select(func.count(AlertRow.id))) > 0
 

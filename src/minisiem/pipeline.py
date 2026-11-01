@@ -38,7 +38,11 @@ class Pipeline:
         return len(self._engine.rules)
 
     def ingest(self, source: str, lines: Iterable[str], year: int | None = None) -> IngestResult:
-        events, skipped = parse_lines(source, lines, tz=self._tz, year=year)
+        # PostgreSQL text columns reject NUL (0x00) bytes. If we let one through, a single hostile
+        # line makes the whole batch fail, which attackers could abuse to hide their traffic.
+        # Make NULs visible instead: they are stored as the four characters \x00.
+        safe_lines = (line.replace("\x00", "\\x00") for line in lines)
+        events, skipped = parse_lines(source, safe_lines, tz=self._tz, year=year)
         events.sort(key=lambda e: e.ts)  # the engine expects time order
 
         with self._lock:

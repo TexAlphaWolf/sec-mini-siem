@@ -8,9 +8,9 @@ from minisiem.api import STATIC_DIR, create_app
 from minisiem.config import Settings
 
 
-def make_client(tmp_path, rules_dir, token: str | None = None) -> TestClient:
+def make_client(database_url, rules_dir, token: str | None = None) -> TestClient:
     settings = Settings(
-        database_url=f"sqlite:///{tmp_path / 'test.db'}",
+        database_url=database_url,
         rules_dir=rules_dir,
         log_timezone="UTC",
         api_token=token,
@@ -19,8 +19,8 @@ def make_client(tmp_path, rules_dir, token: str | None = None) -> TestClient:
 
 
 @pytest.fixture
-def client(tmp_path, rules_dir):
-    with make_client(tmp_path, rules_dir) as c:
+def client(database_url, rules_dir):
+    with make_client(database_url, rules_dir) as c:
         yield c
 
 
@@ -85,8 +85,8 @@ def test_unknown_source_is_404(client):
     assert client.post("/ingest/nope", content=b"x").status_code == 404
 
 
-def test_token_is_required_for_ingest_when_configured(tmp_path, rules_dir, sample_dir):
-    with make_client(tmp_path, rules_dir, token="s3cret") as c:
+def test_token_is_required_for_ingest_when_configured(database_url, rules_dir, sample_dir):
+    with make_client(database_url, rules_dir, token="s3cret") as c:
         body = (sample_dir / "auth.log").read_bytes()
         assert c.post("/ingest/auth", content=body).status_code == 401
         bad = c.post("/ingest/auth", content=body, headers={"Authorization": "Bearer wrong"})
@@ -106,6 +106,19 @@ def test_hostile_log_content_is_returned_as_data_not_markup(client):
     assert client.post("/ingest/auth", content=line.encode(), params={"year": 2026}).json()["parsed"] == 1
     event = client.get("/api/events").json()[0]
     assert event["username"] == "<script>alert(1)</script>"
+
+
+def test_log_lines_with_nul_bytes_do_not_break_ingest(client):
+    """PostgreSQL text columns reject NUL (0x00); a hostile log line must not lose the batch."""
+    line = (
+        '203.0.113.9 - - [20/Oct/2026:10:50:01 +0000] "GET /a HTTP/1.1" 200 5 "-" "evil\x00agent"'
+    )
+    response = client.post("/ingest/nginx", content=line.encode())
+    assert response.status_code == 200
+    assert response.json()["parsed"] == 1
+    stored = client.get("/api/events").json()
+    assert len(stored) == 1
+    assert "\\x00" in stored[0]["raw"]  # the NUL is kept, as visible text
 
 
 def test_dashboard_never_renders_log_data_as_html():

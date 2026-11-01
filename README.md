@@ -91,7 +91,7 @@ machine that wrote the logs.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest                      # 48 tests
+pytest                      # SQLite by default; TEST_DATABASE_URL=postgresql+psycopg://... for PostgreSQL
 ruff check .
 minisiem rules check        # validate rules
 minisiem serve              # SQLite file by default; http://127.0.0.1:8000
