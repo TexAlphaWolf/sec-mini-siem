@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `MINISIEM_READ_TOKEN`: optional bearer token for `GET /api/*`; the dashboard asks for it and
+  keeps it in `sessionStorage`
+- Retention: `MINISIEM_RETENTION_DAYS` (purge at startup, then hourly) and `minisiem purge --days N`
+- Database settings from `POSTGRES_*` variables, so passwords may contain any character
 - CI job that runs the whole test suite against PostgreSQL 16, next to the SQLite matrix
 - `TEST_DATABASE_URL` setting to run the tests on any database
 - Detection-as-code tests: every rule has log lines that must fire it and benign ones that must
@@ -18,6 +22,7 @@ All notable changes to this project are documented here. The format follows
   `no-new-privileges`
 
 ### Changed
+- Tests run with warnings as errors; the CLI and tests now close their database engines
 - Python 3.14 added to the CI test matrix; the Docker image now uses `python:3.14-slim`
 - GitHub Actions updated to versions that run on Node.js 24
 

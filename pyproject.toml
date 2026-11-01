@@ -33,6 +33,12 @@ minisiem = ["static/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# Any warning fails the build, so leaks (such as unclosed database connections) show up early.
+filterwarnings = [
+  "error",
+  # Raised by FastAPI's TestClient inside the installed test dependencies, not by this project.
+  "ignore:Using .httpx. with .starlette.testclient. is deprecated",
+]
 
 [tool.coverage.run]
 source = ["minisiem"]

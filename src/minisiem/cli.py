@@ -1,4 +1,4 @@
-"""Command line interface: `minisiem serve | ingest | rules check`."""
+"""Command line interface: `minisiem serve | ingest | purge | rules check`."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from .config import load_settings
 from .db import init_db, make_session_factory
 from .parsers import PARSERS
 from .pipeline import Pipeline
+from .retention import purge_older_than
 from .rules import RuleError, load_rules
 
 
@@ -61,9 +62,30 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     engine, session_factory = make_session_factory(settings.database_url)
-    init_db(engine)
-    pipeline = Pipeline(session_factory, rules, settings.log_timezone)
+    try:
+        init_db(engine)
+        return _ingest(args, Pipeline(session_factory, rules, settings.log_timezone))
+    finally:
+        engine.dispose()
 
+
+def _cmd_purge(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    days = args.days if args.days is not None else settings.retention_days
+    if days < 1:
+        print("error: pass --days N or set MINISIEM_RETENTION_DAYS", file=sys.stderr)
+        return 1
+    engine, session_factory = make_session_factory(settings.database_url)
+    try:
+        init_db(engine)
+        events, alerts = purge_older_than(session_factory, days)
+    finally:
+        engine.dispose()
+    print(f"deleted events={events} alerts={alerts} older than {days} days")
+    return 0
+
+
+def _ingest(args: argparse.Namespace, pipeline: Pipeline) -> int:
     def report(result) -> None:  # noqa: ANN001
         print(f"parsed={result.parsed} skipped={result.skipped} alerts={result.alerts}")
 
@@ -109,6 +131,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.add_argument("--year", type=int, help="year for syslog lines (default: current year)")
     ingest.set_defaults(func=_cmd_ingest)
+
+    purge = sub.add_parser("purge", help="delete events and alerts older than N days")
+    purge.add_argument("--days", type=int, help="age limit (default: $MINISIEM_RETENTION_DAYS)")
+    purge.set_defaults(func=_cmd_purge)
 
     rules = sub.add_parser("rules", help="work with detection rules")
     rules_sub = rules.add_subparsers(dest="rules_command", required=True)

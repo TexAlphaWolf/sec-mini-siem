@@ -28,9 +28,10 @@ def test_ingest_file_writes_alerts_to_the_database(
     assert main(["ingest", "auth", str(sample_dir / "auth.log"), "--year", "2026"]) == 0
     assert "alerts=" in capsys.readouterr().out
 
-    _, session_factory = make_session_factory(database_url)
+    engine, session_factory = make_session_factory(database_url)
     with session_factory() as session:
         assert session.scalar(select(func.count(AlertRow.id))) > 0
+    engine.dispose()
 
 
 def test_ingest_missing_file_is_an_error(tmp_path, rules_dir, monkeypatch, capsys):

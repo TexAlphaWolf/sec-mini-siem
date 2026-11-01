@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hmac
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -21,9 +23,13 @@ from .config import Settings, load_settings
 from .db import AlertRow, EventRow, init_db, make_session_factory
 from .parsers import PARSERS
 from .pipeline import Pipeline
+from .retention import purge_older_than
 from .rules import load_rules
 
+log = logging.getLogger("minisiem")
+
 STATIC_DIR = Path(__file__).parent / "static"
+RETENTION_INTERVAL_SECONDS = 3600
 MAX_INGEST_BYTES = 5 * 1024 * 1024
 
 # The dashboard loads no third-party code and uses no inline scripts or styles.
@@ -68,9 +74,8 @@ def _alert_dict(row: AlertRow) -> dict[str, Any]:
     }
 
 
-def require_token(request: Request) -> None:
-    """If MINISIEM_API_TOKEN is set, require it as a bearer token."""
-    token = request.app.state.settings.api_token
+def _check_bearer(request: Request, token: str | None) -> None:
+    """Require `token` as a bearer token; do nothing when no token is configured."""
     if not token:
         return
     header = request.headers.get("authorization", "")
@@ -81,6 +86,33 @@ def require_token(request: Request) -> None:
             detail="invalid or missing bearer token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def require_ingest_token(request: Request) -> None:
+    """If MINISIEM_API_TOKEN is set, POST /ingest needs it as a bearer token."""
+    _check_bearer(request, request.app.state.settings.api_token)
+
+
+def require_read_token(request: Request) -> None:
+    """If MINISIEM_READ_TOKEN is set, GET /api/* needs it as a bearer token."""
+    _check_bearer(request, request.app.state.settings.read_token)
+
+
+async def _purge_once(session_factory, days: int) -> None:  # noqa: ANN001
+    """One retention pass; a failure is logged, never fatal."""
+    try:
+        events, alerts = await run_in_threadpool(purge_older_than, session_factory, days)
+        if events or alerts:
+            log.info("retention: deleted %d events and %d alerts", events, alerts)
+    except Exception:
+        log.exception("retention purge failed")
+
+
+async def _retention_loop(session_factory, days: int) -> None:  # noqa: ANN001
+    """Repeat the purge once an hour (the first pass runs at startup)."""
+    while True:
+        await asyncio.sleep(RETENTION_INTERVAL_SECONDS)
+        await _purge_once(session_factory, days)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -94,8 +126,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = settings
         app.state.session_factory = session_factory
         app.state.pipeline = Pipeline(session_factory, rules, settings.log_timezone)
-        yield
-        engine.dispose()
+        purger = None
+        if settings.retention_days > 0:
+            # The first purge runs before the app accepts requests.
+            await _purge_once(session_factory, settings.retention_days)
+            purger = asyncio.create_task(_retention_loop(session_factory, settings.retention_days))
+        try:
+            yield
+        finally:
+            if purger is not None:
+                purger.cancel()
+            engine.dispose()
 
     app = FastAPI(title="Mini-SIEM", version=__version__, lifespan=lifespan)
 
@@ -117,7 +158,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pipeline = request.app.state.pipeline
         return {"status": "ok", "version": __version__, "rules": pipeline.rule_count}
 
-    @app.post("/ingest/{source}", dependencies=[Depends(require_token)])
+    @app.post("/ingest/{source}", dependencies=[Depends(require_ingest_token)])
     async def ingest(
         source: str,
         request: Request,
@@ -142,7 +183,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         result = await run_in_threadpool(request.app.state.pipeline.ingest, source, lines, year)
         return asdict(result)
 
-    @app.get("/api/events")
+    @app.get("/api/events", dependencies=[Depends(require_read_token)])
     def list_events(
         request: Request,
         limit: int = Query(100, ge=1, le=500),
@@ -160,7 +201,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with request.app.state.session_factory() as session:
             return [_event_dict(row) for row in session.scalars(query)]
 
-    @app.get("/api/alerts")
+    @app.get("/api/alerts", dependencies=[Depends(require_read_token)])
     def list_alerts(
         request: Request,
         limit: int = Query(100, ge=1, le=500),
@@ -175,7 +216,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with request.app.state.session_factory() as session:
             return [_alert_dict(row) for row in session.scalars(query)]
 
-    @app.get("/api/stats")
+    @app.get("/api/stats", dependencies=[Depends(require_read_token)])
     def stats(request: Request, hours: int = Query(24, ge=1, le=168)) -> dict[str, Any]:
         with request.app.state.session_factory() as session:
             total_events = session.scalar(select(func.count(EventRow.id))) or 0

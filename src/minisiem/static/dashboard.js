@@ -14,8 +14,24 @@
     return node;
   }
 
+  // The token (only needed when MINISIEM_READ_TOKEN is set) lives in sessionStorage, so it is
+  // forgotten when the tab closes. Storage can be unavailable; the dashboard still works.
+  const TOKEN_KEY = "minisiem.token";
+  function loadToken() {
+    try { return sessionStorage.getItem(TOKEN_KEY) || ""; } catch (_) { return ""; }
+  }
+  function saveToken(value) {
+    try { sessionStorage.setItem(TOKEN_KEY, value); } catch (_) { /* keep going without it */ }
+  }
+  let token = loadToken();
+
+  class AuthError extends Error {}
+
   async function getJSON(url) {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const headers = { Accept: "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, { headers });
+    if (res.status === 401) throw new AuthError("access token required");
     if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
     return res.json();
   }
@@ -102,11 +118,21 @@
       fillTable("sources", stats.top_sources.map((s) => [s.src_ip, s.alerts]));
       fillTable("rules", stats.top_rules.map((r) => [r.title, r.alerts]));
       fillTable("alerts", alerts.map(alertRow));
+      $("login").hidden = true;
       $("status").textContent = `updated ${new Date().toLocaleTimeString()}`;
     } catch (err) {
+      if (err instanceof AuthError) $("login").hidden = false;
       $("status").textContent = `error: ${err.message}`;
     }
   }
+
+  $("login").addEventListener("submit", (event) => {
+    event.preventDefault();
+    token = $("token").value;
+    saveToken(token);
+    $("token").value = "";
+    refresh();
+  });
 
   $("severity").addEventListener("change", refresh);
   refresh();

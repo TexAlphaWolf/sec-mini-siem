@@ -31,10 +31,15 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://minisiem:${POSTGRES_PASSWORD}@db:5432/minisiem
+      POSTGRES_HOST: db
+      POSTGRES_USER: minisiem
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: minisiem
       MINISIEM_RULES_DIR: /app/rules
       MINISIEM_LOG_TZ: ${MINISIEM_LOG_TZ:-UTC}
       MINISIEM_API_TOKEN: ${MINISIEM_API_TOKEN:-}
+      MINISIEM_READ_TOKEN: ${MINISIEM_READ_TOKEN:-}
+      MINISIEM_RETENTION_DAYS: ${MINISIEM_RETENTION_DAYS:-0}
     volumes:
       - ./rules:/app/rules:ro        # edit a rule, then restart the app
       - ./sample_logs:/data:ro       # demo logs

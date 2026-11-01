@@ -136,9 +136,10 @@ This is a tool for watching hostile traffic, so it is built to be safe to run ne
 - **Logs are untrusted.** Attackers control usernames, URLs and user agents. The dashboard writes
   everything with `textContent`, never as HTML, and sends a strict Content-Security-Policy. A test
   fails the build if `innerHTML` or similar DOM APIs appear.
-- **Local by default.** `docker-compose.yml` binds to `127.0.0.1`. Read endpoints have no
-  authentication, so put a reverse proxy with TLS and auth in front before exposing the service.
-- **Optional ingest token.** Set `MINISIEM_API_TOKEN` to require a bearer token on `POST /ingest`.
+- **Local by default.** `docker-compose.yml` binds to `127.0.0.1`. Put a reverse proxy with TLS
+  in front before exposing the service.
+- **Optional tokens.** `MINISIEM_API_TOKEN` requires a bearer token on `POST /ingest`;
+  `MINISIEM_READ_TOKEN` does the same for `GET /api/*`, and the dashboard then asks for it.
 - **Bounded input.** Request bodies are capped at 5 MB and read as a stream.
 - **No secrets in git.** `.env` is ignored; Compose refuses to start without a database password.
 - **Container hardening.** The app runs as a non-root user, with a read-only filesystem, all
@@ -151,7 +152,7 @@ Only run it against logs from systems you own or are authorised to monitor.
 
 - Detection state is in memory: run a single worker, and expect windows to reset on restart.
 - Parsers cover `sshd`, `sudo` and the nginx/Apache combined format.
-- No retention policy yet: old events are kept until you delete them.
+- Retention is off by default: set `MINISIEM_RETENTION_DAYS` or run `minisiem purge --days N`.
 
 ## Roadmap
 
@@ -173,7 +174,8 @@ src/minisiem/
   rules.py           rule loading and the detection engine
   pipeline.py        parse -> detect -> store
   api.py             FastAPI app
-  cli.py             minisiem serve | ingest | rules check
+  retention.py       delete events and alerts older than N days
+  cli.py             minisiem serve | ingest | purge | rules check
   static/            dashboard (HTML, CSS, JS)
 tests/               pytest suite
 docs/                architecture and rule-writing guide

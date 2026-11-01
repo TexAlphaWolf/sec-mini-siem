@@ -8,12 +8,15 @@ from minisiem.api import STATIC_DIR, create_app
 from minisiem.config import Settings
 
 
-def make_client(database_url, rules_dir, token: str | None = None) -> TestClient:
+def make_client(
+    database_url, rules_dir, token: str | None = None, **extra
+) -> TestClient:
     settings = Settings(
         database_url=database_url,
         rules_dir=rules_dir,
         log_timezone="UTC",
         api_token=token,
+        **extra,
     )
     return TestClient(create_app(settings))
 
@@ -134,3 +137,48 @@ def test_dashboard_is_served_with_security_headers(client):
     assert "default-src 'self'" in response.headers["content-security-policy"]
     assert response.headers["x-content-type-options"] == "nosniff"
     assert client.get("/static/dashboard.js").status_code == 200
+
+
+def test_read_endpoints_require_the_read_token_when_configured(database_url, rules_dir):
+    with make_client(database_url, rules_dir, read_token="r3ad") as c:
+        for path in ("/api/alerts", "/api/events", "/api/stats"):
+            assert c.get(path).status_code == 401
+            assert c.get(path, headers={"Authorization": "Bearer wrong"}).status_code == 401
+            assert c.get(path, headers={"Authorization": "Bearer r3ad"}).status_code == 200
+        # The page itself and the health check carry no log data, so they stay open.
+        assert c.get("/").status_code == 200
+        assert c.get("/health").status_code == 200
+
+
+def test_read_token_does_not_unlock_ingest_and_vice_versa(database_url, rules_dir):
+    with make_client(database_url, rules_dir, token="ingest", read_token="read") as c:
+        headers = {"content-type": "text/plain"}
+        assert c.post("/ingest/auth", content=b"x", headers=headers).status_code == 401
+        read = {"Authorization": "Bearer read", **headers}
+        assert c.post("/ingest/auth", content=b"x", headers=read).status_code == 401
+        assert c.get("/api/alerts", headers={"Authorization": "Bearer ingest"}).status_code == 401
+
+
+def test_dashboard_offers_a_token_form_and_keeps_the_token_per_tab():
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    script = (STATIC_DIR / "dashboard.js").read_text(encoding="utf-8")
+    assert 'id="login"' in html
+    assert "sessionStorage" in script
+    assert "localStorage" not in script
+
+
+def test_retention_runs_at_startup(database_url, rules_dir):
+    from datetime import UTC, datetime, timedelta
+
+    from minisiem.db import EventRow, init_db, make_session_factory
+
+    engine, session_factory = make_session_factory(database_url)
+    init_db(engine)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with session_factory() as session, session.begin():
+        session.add(EventRow(ts=now - timedelta(days=90), source="auth", event_type="x", raw="old"))
+        session.add(EventRow(ts=now, source="auth", event_type="x", raw="new"))
+    engine.dispose()
+
+    with make_client(database_url, rules_dir, retention_days=30) as c:
+        assert c.get("/api/stats").json()["events"] == 1

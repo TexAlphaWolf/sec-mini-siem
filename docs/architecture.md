@@ -51,10 +51,12 @@ SQLite and PostgreSQL behave the same. The API adds a `Z` suffix.
 - **Detection state is in memory.** Sliding windows reset when the process restarts, so run a
   single worker. A shared store (for example Redis) would be needed to scale out.
 - **Batches arriving out of order** across requests can miss a threshold that spans them.
-- **Read endpoints are not authenticated.** Only `POST /ingest` supports a token. Bind to
-  localhost (the default in `docker-compose.yml`) or put a reverse proxy with authentication in
-  front.
-- **No retention policy.** Old events are kept forever; add a scheduled `DELETE` for production use.
+- **One shared token per direction.** `MINISIEM_API_TOKEN` protects `POST /ingest` and
+  `MINISIEM_READ_TOKEN` protects `GET /api/*`; there are no users or roles. Bind to localhost
+  (the default in `docker-compose.yml`) or put a reverse proxy with TLS in front.
+- **Retention is by event time.** With `MINISIEM_RETENTION_DAYS` set, the app deletes older rows
+  at startup and then hourly; `minisiem purge --days N` does it once. Importing an old log file
+  while a short retention is set deletes it again at the next pass. Retention is off by default.
 
 ## Treating logs as hostile input
 

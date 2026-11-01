@@ -26,8 +26,9 @@ Mini-SIEM reads log data that an attacker can influence, so the most interesting
 
 These are documented design limits, listed in the README:
 
-- Read endpoints (`/api/*`) have no authentication. Run the service on localhost or behind a
-  reverse proxy with authentication.
+- Read endpoints (`/api/*`) are open unless `MINISIEM_READ_TOKEN` is set. The token is a single
+  shared secret over plain HTTP: for anything beyond localhost put a reverse proxy with TLS in
+  front.
 - Detection state is kept in memory and resets when the process restarts.
 
 ## Security measures already in place
@@ -35,5 +36,6 @@ These are documented design limits, listed in the README:
 - Logs are treated as hostile: parsers validate what they extract, and the dashboard never renders
   log data as HTML (a test fails the build if it does).
 - A strict Content-Security-Policy and other security headers on every response.
-- Request bodies are size-limited; the optional ingest token is compared in constant time.
+- Request bodies are size-limited; the optional ingest and read tokens are compared in constant
+  time, and the dashboard keeps its token only in `sessionStorage` (forgotten when the tab closes).
 - CI runs CodeQL and `pip-audit`, and Dependabot proposes dependency updates.
