@@ -16,6 +16,10 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
+# Local publishing helpers
+.ready
+.desc
+
 # Editors
 .idea/
 .vscode/

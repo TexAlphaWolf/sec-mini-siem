@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - CI job that runs the whole test suite against PostgreSQL 16, next to the SQLite matrix
 - `TEST_DATABASE_URL` setting to run the tests on any database
+- Security policy, Dependabot updates, CodeQL analysis and a `pip-audit` job in CI
+- Container hardening in `docker-compose.yml`: read-only filesystem, no Linux capabilities,
+  `no-new-privileges`
+
+### Changed
+- GitHub Actions updated to versions that run on Node.js 24
 
 ### Fixed
 - A log line containing a NUL byte made PostgreSQL reject the whole batch, which could be abused

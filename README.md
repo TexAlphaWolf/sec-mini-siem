@@ -140,7 +140,9 @@ This is a tool for watching hostile traffic, so it is built to be safe to run ne
 - **Optional ingest token.** Set `MINISIEM_API_TOKEN` to require a bearer token on `POST /ingest`.
 - **Bounded input.** Request bodies are capped at 5 MB and read as a stream.
 - **No secrets in git.** `.env` is ignored; Compose refuses to start without a database password.
-- **Container hardening.** The app runs as a non-root user.
+- **Container hardening.** The app runs as a non-root user, with a read-only filesystem, all
+  Linux capabilities dropped and `no-new-privileges`.
+- **Reporting.** Found a vulnerability? See [SECURITY.md](SECURITY.md).
 
 Only run it against logs from systems you own or are authorised to monitor.
 

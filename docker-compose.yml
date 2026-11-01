@@ -2,6 +2,8 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_USER: minisiem
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
@@ -17,6 +19,14 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # Hardening: nothing to write to, no extra privileges, no Linux capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       db:
         condition: service_healthy
@@ -30,6 +40,7 @@ services:
       - ./sample_logs:/data:ro       # demo logs
     ports:
       # Bound to localhost on purpose: put a reverse proxy with TLS and auth in front to expose it.
+      # The host port is configurable (MINISIEM_PORT in .env) for machines where 8000 is taken.
       - "127.0.0.1:${MINISIEM_PORT:-8000}:8000"
 
 volumes:
