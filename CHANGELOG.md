@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows
   `no-new-privileges`
 
 ### Changed
+- Python 3.14 added to the CI test matrix; the Docker image now uses `python:3.14-slim`
 - GitHub Actions updated to versions that run on Node.js 24
 
 ### Fixed
