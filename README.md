@@ -14,12 +14,13 @@ framework magic.
 
 ## What it detects
 
-Ten rules ship by default, each tagged with its MITRE ATT&CK technique:
+Eleven rules ship by default, each tagged with its MITRE ATT&CK technique:
 
 | Rule | Severity | Detects |
 |------|----------|---------|
 | `ssh-bruteforce` | high | 5+ failed SSH logins from one IP in 60 s |
-| `ssh-user-enumeration` | medium | 3+ attempts on non-existent users in 5 min |
+| `ssh-user-enumeration` | medium | 3+ *different* non-existent usernames from one IP in 5 min |
+| `ssh-password-spraying` | high | failed logins for 5+ *different* accounts from one IP in 10 min |
 | `ssh-root-attempts` | medium | 3+ failed logins for `root` in 5 min |
 | `ssh-root-login` | medium | successful direct root login |
 | `sudo-repeated-failures` | medium | 3+ failed `sudo` authentications by one user in 10 min |
@@ -95,6 +96,7 @@ pytest --cov                # tests and coverage; SQLite by default,
                             # TEST_DATABASE_URL=postgresql+psycopg://... for PostgreSQL
 ruff check .
 minisiem rules check        # validate rules
+minisiem rules export       # the same rules as Sigma (see docs/writing-rules.md)
 minisiem serve              # SQLite file by default; http://127.0.0.1:8000
 ```
 
@@ -150,7 +152,8 @@ Only run it against logs from systems you own or are authorised to monitor.
 
 ## Limitations
 
-- Detection state is in memory: run a single worker, and expect windows to reset on restart.
+- Run a single worker: detection windows live in memory. After a restart they are rebuilt from
+  the stored events, so an attack in progress keeps its count and is not alerted twice.
 - Parsers cover `sshd`, `sudo` and the nginx/Apache combined format.
 - Retention is off by default: set `MINISIEM_RETENTION_DAYS` or run `minisiem purge --days N`.
 
@@ -158,10 +161,10 @@ Only run it against logs from systems you own or are authorised to monitor.
 
 - [ ] Notifications (Telegram, email) when an alert fires
 - [ ] GeoIP enrichment of source addresses
-- [ ] "Distinct values" thresholds (for example 10 different usernames from one IP)
+- [x] "Distinct values" thresholds (for example 5 different usernames from one IP)
 - [ ] Windows Event Log and journald parsers
-- [ ] Persist detection state across restarts
-- [ ] Export alerts in Sigma-compatible form
+- [x] Persist detection state across restarts
+- [x] Export the rules in Sigma format
 
 ## Project layout
 

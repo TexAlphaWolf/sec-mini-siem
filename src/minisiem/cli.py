@@ -1,4 +1,4 @@
-"""Command line interface: `minisiem serve | ingest | purge | rules check`."""
+"""Command line interface: `minisiem serve | ingest | purge | rules check | rules export`."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from .parsers import PARSERS
 from .pipeline import Pipeline
 from .retention import purge_older_than
 from .rules import RuleError, load_rules
+from .sigma import export_sigma
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -34,6 +35,21 @@ def _cmd_rules_check(args: argparse.Namespace) -> int:
     for rule in rules:
         kind = "threshold" if rule.threshold else "single"
         print(f"  {rule.severity:<8} {rule.id:<28} {kind:<9} {rule.title}")
+    return 0
+
+
+def _cmd_rules_export(args: argparse.Namespace) -> int:
+    directory = Path(args.directory) if args.directory else load_settings().rules_dir
+    try:
+        text = export_sigma(load_rules(directory))
+    except RuleError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+        print(f"wrote {args.output}")
+    else:
+        sys.stdout.write(text)
     return 0
 
 
@@ -98,6 +114,8 @@ def _ingest(args: argparse.Namespace, pipeline: Pipeline) -> int:
         print(f"error: no such file: {path}", file=sys.stderr)
         return 1
 
+    if args.follow:
+        pipeline.restore_state()  # a long-running follower continues where the last run stopped
     lines, position = _read_new(path, 0)
     report(pipeline.ingest(args.source, lines, year=args.year))
     if not args.follow:
@@ -143,6 +161,12 @@ def build_parser() -> argparse.ArgumentParser:
         "directory", nargs="?", help="rules directory (default: $MINISIEM_RULES_DIR)"
     )
     check.set_defaults(func=_cmd_rules_check)
+    export = rules_sub.add_parser("export", help="export the rules in Sigma format")
+    export.add_argument(
+        "directory", nargs="?", help="rules directory (default: $MINISIEM_RULES_DIR)"
+    )
+    export.add_argument("-o", "--output", help="write to this file instead of the screen")
+    export.set_defaults(func=_cmd_rules_export)
     return parser
 
 

@@ -29,7 +29,21 @@ threshold:
   count: 5          # fire after this many matching events ...
   window: 60s       # ... inside this window (s, m, h or d)
   group_by: src_ip  # ... counted separately per value of this field
+  distinct: username  # optional: count different values of this field, not events
 ```
+
+### Counting distinct values
+
+With `distinct`, the threshold counts how many *different* values of a field were seen, instead of
+how many events. This tells apart attacks that look alike in a plain count:
+
+```yaml
+# Password spraying: many accounts from one IP (a brute force hammers one account instead)
+threshold: {count: 5, window: 10m, group_by: src_ip, distinct: username}
+```
+
+The alert lists some of the values in its details. `distinct` and `group_by` must be different
+fields, and events that lack the `distinct` field are ignored.
 
 ### Keeping noisy rules quiet
 
@@ -77,6 +91,18 @@ log source.
 
 Prefer `path_decoded` for attack patterns: it is URL-decoded once, so `union%20select` becomes
 `union select`.
+
+## Exporting to Sigma
+
+```bash
+minisiem rules export -o sigma-rules.yml
+```
+
+Every rule becomes a Sigma detection rule; rules with a threshold also get a Sigma v2
+correlation rule (`event_count`, or `value_count` when the threshold uses `distinct`). Two
+caveats: the field names are Mini-SIEM's own (`src_ip`, `username`, ...), so a Sigma backend needs
+a field mapping for your log store; and the one-alert-per-window silencing has no Sigma
+equivalent, so `count: 1` rules are exported as plain detections.
 
 ## Adding support for a new log format
 

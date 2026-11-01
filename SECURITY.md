@@ -29,7 +29,8 @@ These are documented design limits, listed in the README:
 - Read endpoints (`/api/*`) are open unless `MINISIEM_READ_TOKEN` is set. The token is a single
   shared secret over plain HTTP: for anything beyond localhost put a reverse proxy with TLS in
   front.
-- Detection state is kept in memory and resets when the process restarts.
+- Detection state is kept in memory. It is rebuilt from the database at startup, so one process
+  (one worker) must own a database.
 
 ## Security measures already in place
 

@@ -12,6 +12,7 @@ A rule is a YAML file:
       count: 5
       window: 60s                       # s, m, h or d
       group_by: src_ip                  # count separately per value of this field
+      distinct: username                # optional: count distinct values of this field instead
 
 Field modifiers: `field|contains`, `field|startswith`, `field|endswith`,
 `field|re` (regex), `field|gte`, `field|lte`. Text comparisons are case-insensitive.
@@ -20,7 +21,8 @@ Field modifiers: `field|contains`, `field|startswith`, `field|endswith`,
 from __future__ import annotations
 
 import re
-from collections import deque
+from collections import Counter, deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -81,6 +83,7 @@ class Threshold:
     count: int
     window_seconds: int
     group_by: str | None = None
+    distinct: str | None = None  # count distinct values of this field, not events
 
 
 @dataclass(frozen=True)
@@ -171,7 +174,12 @@ def _build_rule(doc: Any, path: Path) -> Rule:
         group_by = raw.get("group_by")
         if group_by is not None and not isinstance(group_by, str):
             raise RuleError("threshold 'group_by' must be a field name")
-        threshold = Threshold(count, parse_duration(raw["window"]), group_by)
+        distinct = raw.get("distinct")
+        if distinct is not None and not isinstance(distinct, str):
+            raise RuleError("threshold 'distinct' must be a field name")
+        if distinct is not None and distinct == group_by:
+            raise RuleError("threshold 'distinct' and 'group_by' must be different fields")
+        threshold = Threshold(count, parse_duration(raw["window"]), group_by, distinct)
 
     tags = doc.get("tags") or []
     if not isinstance(tags, list):
@@ -219,24 +227,100 @@ def load_rules(directory: str | Path) -> list[Rule]:
 # --------------------------------------------------------------------------- engine
 
 
+class _Window:
+    """Events of one (rule, group) inside the sliding window.
+
+    For "distinct" thresholds a counter of values is kept next to the events, so counting the
+    distinct values stays O(1) even when a flood puts thousands of events in the window.
+    """
+
+    __slots__ = ("items", "counts")
+
+    def __init__(self, track_values: bool) -> None:
+        self.items: deque[tuple[datetime, str | None]] = deque()
+        self.counts: Counter[str] | None = Counter() if track_values else None
+
+    def add(self, ts: datetime, value: str | None) -> None:
+        self.items.append((ts, value))
+        if self.counts is not None and value is not None:
+            self.counts[value] += 1
+
+    def expire(self, cutoff: datetime) -> None:
+        while self.items and self.items[0][0] < cutoff:
+            _, value = self.items.popleft()
+            if self.counts is not None and value is not None:
+                self.counts[value] -= 1
+                if self.counts[value] <= 0:
+                    del self.counts[value]
+
+    def size(self) -> int:
+        return len(self.counts) if self.counts is not None else len(self.items)
+
+    def clear(self) -> None:
+        self.items.clear()
+        if self.counts is not None:
+            self.counts.clear()
+
+    @property
+    def first_ts(self) -> datetime:
+        return self.items[0][0]
+
+    @property
+    def last_ts(self) -> datetime:
+        return self.items[-1][0]
+
+    def sample_values(self, limit: int = 10) -> list[str]:
+        """Some of the distinct values (they come from logs, so they are cut short)."""
+        return [value[:64] for value in sorted(self.counts or ())[:limit]]
+
+
 class RuleEngine:
     """Evaluates events against rules, one at a time, in timestamp order.
 
-    Threshold rules keep a sliding window of timestamps per (rule, group). After a threshold
-    alert fires, that group is silenced for one window so a sustained attack produces one alert
-    per window, not one per log line. State lives in memory: restarting the process resets it.
+    Threshold rules keep a sliding window per (rule, group). After a threshold alert fires,
+    that group is silenced for one window so a sustained attack produces one alert per window,
+    not one per log line. State lives in memory; `restore()` rebuilds it after a restart from
+    the events and alerts that were stored.
     """
 
     _SWEEP_EVERY = 5000
 
     def __init__(self, rules: list[Rule]) -> None:
         self.rules = rules
-        self._windows: dict[tuple[str, str], deque[datetime]] = {}
+        self._windows: dict[tuple[str, str], _Window] = {}
         self._silenced_until: dict[tuple[str, str], datetime] = {}
         self._max_window = max(
             (r.threshold.window_seconds for r in rules if r.threshold), default=0
         )
         self._calls = 0
+
+    @property
+    def horizon_seconds(self) -> int:
+        """How far back events matter: the longest window of any rule."""
+        return self._max_window
+
+    def restore(
+        self,
+        events: Iterable[Event],
+        alerts: Iterable[tuple[str, str | None, datetime]] = (),
+    ) -> None:
+        """Rebuild the window state after a restart.
+
+        `events` are replayed in time order (the alerts they raise were stored the first time,
+        so they are dropped). `alerts` are (rule_id, group_key, ts) of stored threshold alerts:
+        they keep a group silent even when the events that caused them are older than the replay.
+        """
+        for event in events:
+            self.evaluate(event)
+        windows = {r.id: r.threshold.window_seconds for r in self.rules if r.threshold}
+        for rule_id, group_key, ts in alerts:
+            seconds = windows.get(rule_id)
+            if seconds is None or group_key is None:
+                continue
+            until = ts + timedelta(seconds=seconds)
+            key = (rule_id, group_key)
+            if until > self._silenced_until.get(key, datetime.min):
+                self._silenced_until[key] = until
 
     def evaluate(self, event: Event) -> list[Alert]:
         data = event.match_view()
@@ -265,27 +349,37 @@ class RuleEngine:
         else:
             group_key = "*"
 
+        distinct_value: str | None = None
+        if threshold.distinct:
+            raw_value = data.get(threshold.distinct)
+            if raw_value is None:
+                return None  # nothing to count for this event
+            distinct_value = str(raw_value)
+
         key = (rule.id, group_key)
-        window = self._windows.setdefault(key, deque())
-        window.append(event.ts)
-        cutoff = event.ts - timedelta(seconds=threshold.window_seconds)
-        while window and window[0] < cutoff:
-            window.popleft()
+        window = self._windows.get(key)
+        if window is None:
+            window = self._windows[key] = _Window(track_values=threshold.distinct is not None)
+        window.add(event.ts, distinct_value)
+        window.expire(event.ts - timedelta(seconds=threshold.window_seconds))
 
         silenced = self._silenced_until.get(key)
         if silenced is not None and event.ts < silenced:
             return None
-        if len(window) < threshold.count:
+        if window.size() < threshold.count:
             return None
 
-        details = {
+        details: dict[str, Any] = {
             "group_by": threshold.group_by,
             "window_seconds": threshold.window_seconds,
             "threshold": threshold.count,
-            "first_seen": window[0].isoformat() + "Z",
+            "first_seen": window.first_ts.isoformat() + "Z",
             "last_seen": event.ts.isoformat() + "Z",
         }
-        alert = self._alert(rule, event, len(window), group_key, details)
+        if threshold.distinct:
+            details["distinct"] = threshold.distinct
+            details["values"] = window.sample_values()
+        alert = self._alert(rule, event, window.size(), group_key, details)
         self._silenced_until[key] = event.ts + timedelta(seconds=threshold.window_seconds)
         window.clear()
         return alert
@@ -316,7 +410,8 @@ class RuleEngine:
     def _sweep(self, now: datetime) -> None:
         """Drop state for groups that have been quiet for longer than any window."""
         horizon = timedelta(seconds=self._max_window)
-        for key in [k for k, w in self._windows.items() if not w or now - w[-1] > horizon]:
+        quiet = [k for k, w in self._windows.items() if not w.items or now - w.last_ts > horizon]
+        for key in quiet:
             del self._windows[key]
         for key in [k for k, until in self._silenced_until.items() if until < now]:
             del self._silenced_until[key]

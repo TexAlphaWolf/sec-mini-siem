@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from datetime import timedelta
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from .db import AlertRow, EventRow
+from .events import Event
 from .parsers import parse_lines
 from .rules import Rule, RuleEngine
 
@@ -36,6 +39,56 @@ class Pipeline:
     @property
     def rule_count(self) -> int:
         return len(self._engine.rules)
+
+    def restore_state(self) -> int:
+        """Rebuild the detection windows from the database after a restart.
+
+        Replays the stored events of the last window (relative to the newest stored event) and
+        re-applies the silence of stored alerts, so an attack in progress neither loses its
+        count nor raises a second alert. Returns the number of events replayed.
+        """
+        horizon = self._engine.horizon_seconds
+        if horizon == 0:
+            return 0
+        replayed = 0
+        with self._session_factory() as session:
+            latest = session.scalar(select(func.max(EventRow.ts)))
+            if latest is None:
+                return 0
+            since = latest - timedelta(seconds=horizon)
+            alerts = [
+                tuple(row)
+                for row in session.execute(
+                    select(AlertRow.rule_id, AlertRow.group_key, AlertRow.ts).where(
+                        AlertRow.ts >= since
+                    )
+                )
+            ]
+            rows = session.scalars(
+                select(EventRow)
+                .where(EventRow.ts >= since)
+                .order_by(EventRow.ts, EventRow.id)
+                .execution_options(yield_per=1000)
+            )
+
+            def events() -> Iterator[Event]:
+                nonlocal replayed
+                for row in rows:
+                    replayed += 1
+                    yield Event(
+                        ts=row.ts,
+                        source=row.source,
+                        event_type=row.event_type,
+                        host=row.host,
+                        src_ip=row.src_ip,
+                        username=row.username,
+                        raw=row.raw,
+                        fields=row.fields or {},
+                    )
+
+            with self._lock:
+                self._engine.restore(events(), alerts)
+        return replayed
 
     def ingest(self, source: str, lines: Iterable[str], year: int | None = None) -> IngestResult:
         # PostgreSQL text columns reject NUL (0x00) bytes. If we let one through, a single hostile

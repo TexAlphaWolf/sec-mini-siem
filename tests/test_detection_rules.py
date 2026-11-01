@@ -87,9 +87,22 @@ CASES: dict[str, tuple[str, dict[str, list[list[str]]]]] = {
         {
             "fires": [[invalid(i * 30, user=f"user{i}") for i in range(3)]],
             "quiet": [
-                [invalid(i * 30) for i in range(2)],
-                [invalid(i * 30, ip=f"203.0.113.{i + 1}") for i in range(3)],
+                [invalid(i * 30, user=f"user{i}") for i in range(2)],  # two different names
+                [invalid(i * 30) for i in range(6)],  # one name tried again and again
+                [invalid(i * 30, user=f"user{i}", ip=f"203.0.113.{i + 1}") for i in range(3)],
                 [failed(i * 30) for i in range(5)],  # wrong password for an existing user
+            ],
+        },
+    ),
+    "ssh-password-spraying": (
+        "auth",
+        {
+            "fires": [[failed(i * 20, user=f"user{i}") for i in range(5)]],
+            "quiet": [
+                [failed(i * 20, user=f"user{i}") for i in range(4)],  # one account short
+                [failed(i * 20) for i in range(10)],  # brute force on a single account
+                [failed(i * 20, user=f"user{i}", ip=f"203.0.113.{i + 1}") for i in range(5)],
+                [failed(i * 300, user=f"user{i}") for i in range(5)],  # too slow for the window
             ],
         },
     ),

@@ -48,8 +48,11 @@ SQLite and PostgreSQL behave the same. The API adds a `Z` suffix.
 
 ## Known limitations
 
-- **Detection state is in memory.** Sliding windows reset when the process restarts, so run a
-  single worker. A shared store (for example Redis) would be needed to scale out.
+- **Detection state is in memory.** Sliding windows live in the process, so run a single worker;
+  a shared store (for example Redis) would be needed to scale out. After a restart the windows
+  are rebuilt: the app replays the stored events of the last window (the longest window of any
+  rule, counted back from the newest stored event) and re-applies the silence of stored alerts.
+  `minisiem ingest` of a single file starts clean on purpose; `--follow` and `serve` restore.
 - **Batches arriving out of order** across requests can miss a threshold that spans them.
 - **One shared token per direction.** `MINISIEM_API_TOKEN` protects `POST /ingest` and
   `MINISIEM_READ_TOKEN` protects `GET /api/*`; there are no users or roles. Bind to localhost

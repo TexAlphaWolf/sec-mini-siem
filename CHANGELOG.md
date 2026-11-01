@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- "Distinct values" thresholds (`distinct: username`) and a new `ssh-password-spraying` rule;
+  `ssh-user-enumeration` now counts different usernames instead of events
+- Detection state is rebuilt from the database at startup (`serve` and `ingest --follow`), so a
+  restart no longer forgets an attack in progress or raises its alert twice
+- `minisiem rules export`: the rules as Sigma detection and correlation rules
 - `MINISIEM_READ_TOKEN`: optional bearer token for `GET /api/*`; the dashboard asks for it and
   keeps it in `sessionStorage`
 - Retention: `MINISIEM_RETENTION_DAYS` (purge at startup, then hourly) and `minisiem purge --days N`

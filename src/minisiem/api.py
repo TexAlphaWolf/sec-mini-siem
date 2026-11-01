@@ -126,6 +126,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = settings
         app.state.session_factory = session_factory
         app.state.pipeline = Pipeline(session_factory, rules, settings.log_timezone)
+        # Pick up where the previous process left off (windows and silenced groups).
+        await run_in_threadpool(app.state.pipeline.restore_state)
         purger = None
         if settings.retention_days > 0:
             # The first purge runs before the app accepts requests.
