@@ -9,6 +9,7 @@ Only RFC 5737 documentation addresses are used (192.0.2.0/24, 198.51.100.0/24,
 
 from __future__ import annotations
 
+import json
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -106,11 +107,97 @@ def access_lines() -> list[tuple[datetime, str]]:
     return sorted(rows, key=lambda r: r[0])
 
 
+EPOCH = datetime(1970, 1, 1)
+
+
+def journal_entry(ts: datetime, ident: str, pid: int, msg: str) -> str:
+    """One `journalctl -o json` line (only the fields the parser reads, plus a few usual ones)."""
+    micros = (ts - EPOCH) // timedelta(microseconds=1)
+    entry = {
+        "__REALTIME_TIMESTAMP": str(micros),
+        "_HOSTNAME": "db01",
+        "SYSLOG_IDENTIFIER": ident,
+        "_PID": str(pid),
+        "_SYSTEMD_UNIT": "ssh.service" if ident == "sshd" else "session-3.scope",
+        "PRIORITY": "5",
+        "MESSAGE": msg,
+    }
+    return json.dumps(entry, separators=(",", ":"))
+
+
+def journal_lines() -> list[tuple[datetime, str]]:
+    """The same kinds of events as auth.log, but from a systemd host (db01)."""
+    rows: list[tuple[datetime, str]] = []
+    ts = BASE + timedelta(minutes=20)
+    rows.append((ts, journal_entry(ts, "sshd", 4100, "Accepted publickey for alice from 192.0.2.10 port 50122 ssh2: ED25519 SHA256:xxxx")))
+
+    # Password spraying from 203.0.113.61: one or two tries for each of many accounts.
+    ts = BASE + timedelta(hours=1, minutes=5)
+    for i, user in enumerate(["admin", "deploy", "jenkins", "postgres", "backup", "grafana", "ubuntu", "git"]):
+        ts += timedelta(seconds=rng.randint(20, 40))
+        port = rng.randint(30000, 60000)
+        rows.append((ts, journal_entry(ts, "sshd", 4200 + i, f"Failed password for {user} from 203.0.113.61 port {port} ssh2")))
+
+    ts = BASE + timedelta(hours=2, minutes=10)
+    for _ in range(3):
+        ts += timedelta(minutes=1)
+        rows.append((ts, journal_entry(ts, "sudo", 4300, "    carol : 3 incorrect password attempts ; TTY=pts/2 ; PWD=/home/carol ; USER=root ; COMMAND=/usr/bin/less /var/log/syslog")))
+    return sorted(rows, key=lambda r: r[0])
+
+
+def windows_event(ts: datetime, event_id: int, channel: str, data: dict[str, str]) -> str:
+    """One event in the layout written by the PowerShell snippet in docs/log-sources.md."""
+    entry = {
+        "TimeCreated": ts.strftime("%Y-%m-%dT%H:%M:%S.%f") + "0Z",  # PowerShell gives 7 digits
+        "EventID": event_id,
+        "Computer": "WIN-DESK01",
+        "Channel": channel,
+        "Data": data,
+    }
+    return json.dumps(entry, separators=(",", ":"))
+
+
+def windows_lines() -> list[tuple[datetime, str]]:
+    rows: list[tuple[datetime, str]] = []
+
+    def add(ts: datetime, event_id: int, channel: str, data: dict[str, str]) -> None:
+        rows.append((ts, windows_event(ts, event_id, channel, data)))
+
+    # Everyday: the owner logs on at the console.
+    ts = BASE + timedelta(minutes=2)
+    add(ts, 4624, "Security", {"TargetUserName": "luca", "TargetDomainName": "WIN-DESK01", "LogonType": "2", "IpAddress": "-", "WorkstationName": "WIN-DESK01", "AuthenticationPackageName": "Negotiate"})
+
+    # Remote Desktop brute force from 198.51.100.77: rapid failures, then a successful RDP logon.
+    ts = BASE + timedelta(hours=1, minutes=40)
+    for user in ["administrator", "admin", "luca", "guest", "user", "test", "support"]:
+        ts += timedelta(seconds=rng.randint(3, 6))
+        add(ts, 4625, "Security", {"TargetUserName": user, "TargetDomainName": "WIN-DESK01", "LogonType": "3", "IpAddress": "198.51.100.77", "WorkstationName": "-", "Status": "0xc000006d", "SubStatus": "0xc000006a"})
+    ts += timedelta(seconds=20)
+    add(ts, 4624, "Security", {"TargetUserName": "administrator", "TargetDomainName": "WIN-DESK01", "LogonType": "10", "IpAddress": "198.51.100.77", "WorkstationName": "-", "AuthenticationPackageName": "Negotiate"})
+    ts += timedelta(seconds=2)
+    add(ts, 4672, "Security", {"SubjectUserName": "administrator", "SubjectDomainName": "WIN-DESK01"})
+
+    # What an intruder does next: a new account, made an administrator, a service and a task.
+    ts += timedelta(minutes=3)
+    add(ts, 4720, "Security", {"TargetUserName": "support$helper", "SubjectUserName": "administrator"})
+    ts += timedelta(seconds=15)
+    add(ts, 4732, "Security", {"TargetUserName": "Administrators", "MemberName": "-", "MemberSid": "S-1-5-21-1111111111-2222222222-3333333333-1005", "SubjectUserName": "administrator"})
+    ts += timedelta(minutes=1)
+    add(ts, 7045, "System", {"ServiceName": "UpdateHelper", "ImageFileName": "C:\\Users\\Public\\uh.exe", "StartType": "auto start", "AccountName": "LocalSystem"})
+    ts += timedelta(seconds=30)
+    add(ts, 4698, "Security", {"TaskName": "\\Microsoft\\Windows\\UpdateHelper", "SubjectUserName": "administrator"})
+    ts += timedelta(minutes=2)
+    add(ts, 1102, "Security", {})
+    return sorted(rows, key=lambda r: r[0])
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     (OUT / "auth.log").write_text("\n".join(line for _, line in auth_lines()) + "\n", encoding="utf-8")
     (OUT / "access.log").write_text("\n".join(line for _, line in access_lines()) + "\n", encoding="utf-8")
-    print(f"wrote {OUT}/auth.log and {OUT}/access.log")
+    (OUT / "journal.jsonl").write_text("\n".join(line for _, line in journal_lines()) + "\n", encoding="utf-8")
+    (OUT / "windows-security.jsonl").write_text("\n".join(line for _, line in windows_lines()) + "\n", encoding="utf-8")
+    print(f"wrote auth.log, access.log, journal.jsonl and windows-security.jsonl to {OUT}")
 
 
 if __name__ == "__main__":

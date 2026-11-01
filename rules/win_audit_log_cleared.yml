@@ -1,0 +1,7 @@
+id: win-audit-log-cleared
+title: Windows event log cleared
+description: An event log was cleared (events 1102 and 104). Attackers clear logs to hide what they did, so this is rarely benign.
+severity: high
+tags: [attack.defense_evasion, attack.t1070.001]
+match:
+  event_type: win_audit_log_cleared

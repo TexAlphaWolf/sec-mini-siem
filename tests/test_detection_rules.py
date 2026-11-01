@@ -6,6 +6,7 @@ production. Adding a rule without adding cases here fails `test_every_shipped_ru
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 import pytest
@@ -62,6 +63,28 @@ def web(sec, path="/", status=200, ip="203.0.113.77", ua=UA_BROWSER):
     return (
         f'{ip} - - [{t:%d/%b/%Y:%H:%M:%S} +0000] "GET {path} HTTP/1.1" {status} 100 "-" "{ua}"'
     )
+
+
+# --- Windows event lines ----------------------------------------------------------------------
+
+
+def win(sec, event_id, data=None, channel="Security", host="WIN-DESK01"):
+    stamp = f"{_stamp(sec):%Y-%m-%dT%H:%M:%S}Z"
+    doc = {"TimeCreated": stamp, "EventID": event_id, "Computer": host, "Channel": channel}
+    return json.dumps({**doc, "Data": data or {}})
+
+
+def win_failed(sec, user="administrator", ip="198.51.100.77"):
+    return win(sec, 4625, {"TargetUserName": user, "LogonType": "3", "IpAddress": ip})
+
+
+def win_logon(sec, logon_type="10", user="alice", ip="198.51.100.77"):
+    data = {"TargetUserName": user, "LogonType": logon_type, "IpAddress": ip}
+    return win(sec, 4624, data)
+
+
+def win_group(sec, group):
+    return win(sec, 4732, {"TargetUserName": group, "SubjectUserName": "admin"})
 
 
 # --- the cases ---------------------------------------------------------------------------------
@@ -187,6 +210,76 @@ CASES: dict[str, tuple[str, dict[str, list[list[str]]]]] = {
                 [web(0, "/search?q=credit+union+selection")],  # "union select" inside two words
                 [web(0, "/search?q=color+1%3D1")],  # "or 1=1" inside "color"
             ],
+        },
+    ),
+    "win-logon-bruteforce": (
+        "windows",
+        {
+            "fires": [[win_failed(i) for i in range(5)]],
+            "quiet": [
+                [win_failed(i) for i in range(4)],
+                [win_failed(i, ip=f"198.51.100.{i + 1}") for i in range(5)],
+                [win_failed(i * 30) for i in range(5)],
+                [win_failed(i, ip="-") for i in range(10)],  # at the console: no address to group by
+            ],
+        },
+    ),
+    "win-password-spraying": (
+        "windows",
+        {
+            "fires": [[win_failed(i * 20, user=f"user{i}") for i in range(5)]],
+            "quiet": [
+                [win_failed(i * 20, user=f"user{i}") for i in range(4)],
+                [win_failed(i * 20) for i in range(10)],
+                [win_failed(i * 20, user=f"user{i}", ip=f"198.51.100.{i + 1}") for i in range(5)],
+                [win_failed(i * 300, user=f"user{i}") for i in range(5)],
+            ],
+        },
+    ),
+    "win-rdp-logon": (
+        "windows",
+        {
+            "fires": [[win_logon(0, "10")]],
+            "quiet": [[win_logon(0, "2", ip="-")], [win_logon(0, "3")]],
+        },
+    ),
+    "win-user-created": (
+        "windows",
+        {
+            "fires": [[win(0, 4720, {"TargetUserName": "newuser", "SubjectUserName": "admin"})]],
+            "quiet": [[win_logon(0, "2", ip="-")]],
+        },
+    ),
+    "win-admin-group-change": (
+        "windows",
+        {
+            "fires": [
+                [win_group(0, "Administrators")],
+                [win_group(0, "Amministratori")],
+                [win_group(0, "Domain Admins")],
+            ],
+            "quiet": [[win_group(0, "Remote Desktop Users")], [win_group(0, "Users")]],
+        },
+    ),
+    "win-audit-log-cleared": (
+        "windows",
+        {
+            "fires": [[win(0, 1102)], [win(0, 104, channel="System")]],
+            "quiet": [[win_logon(0, "2", ip="-")]],
+        },
+    ),
+    "win-service-installed": (
+        "windows",
+        {
+            "fires": [[win(0, 7045, {"ServiceName": "x", "ImageFileName": "C:\\x.exe"}, "System")]],
+            "quiet": [[win(0, 4672, {"SubjectUserName": "admin"})]],
+        },
+    ),
+    "win-scheduled-task-created": (
+        "windows",
+        {
+            "fires": [[win(0, 4698, {"TaskName": "\\t", "SubjectUserName": "admin"})]],
+            "quiet": [[win_logon(0, "2", ip="-")]],
         },
     ),
     "web-scanner-user-agent": (

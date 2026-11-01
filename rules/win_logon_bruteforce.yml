@@ -1,0 +1,11 @@
+id: win-logon-bruteforce
+title: Windows logon brute-force attempt
+description: Five or more failed Windows logons (event 4625) from the same source IP within one minute. Typical of password guessing against RDP or SMB.
+severity: high
+tags: [attack.credential_access, attack.t1110]
+match:
+  event_type: win_logon_failed
+threshold:
+  count: 5
+  window: 60s
+  group_by: src_ip

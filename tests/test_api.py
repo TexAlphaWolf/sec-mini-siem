@@ -182,3 +182,14 @@ def test_retention_runs_at_startup(database_url, rules_dir):
 
     with make_client(database_url, rules_dir, retention_days=30) as c:
         assert c.get("/api/stats").json()["events"] == 1
+
+
+@pytest.mark.parametrize(
+    ("source", "file_name", "alerts"),
+    [("journald", "journal.jsonl", 2), ("windows", "windows-security.jsonl", 8)],
+)
+def test_json_log_sources_end_to_end(client, sample_dir, source, file_name, alerts):
+    result = post_log(client, source, sample_dir / file_name).json()
+    assert result["skipped"] == 0
+    assert result["alerts"] == alerts
+    assert any(e["source"] == source for e in client.get("/api/events").json())

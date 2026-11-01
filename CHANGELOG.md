@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `journald` source (`journalctl -o json`): sshd and sudo events, read by the same rules as `auth`
+- `windows` source: Security and System events as JSON lines (PowerShell export or Winlogbeat)
+  and eight `win-*` rules: logon brute force and spraying, Remote Desktop logon, new user,
+  administrator group change, cleared logs, new service, new scheduled task
+- `docs/log-sources.md`, and journald and Windows sample logs
 - "Distinct values" thresholds (`distinct: username`) and a new `ssh-password-spraying` rule;
   `ssh-user-enumeration` now counts different usernames instead of events
 - Detection state is rebuilt from the database at startup (`serve` and `ingest --follow`), so a

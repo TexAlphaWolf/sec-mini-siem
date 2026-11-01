@@ -79,7 +79,9 @@ def _iso_ts(value: str, tz: str) -> datetime | None:
     return to_utc_naive(moment)
 
 
-def _classify(prog: str, msg: str) -> tuple[str, str | None, str | None, dict[str, Any]] | None:
+def classify_message(
+    prog: str, msg: str
+) -> tuple[str, str | None, str | None, dict[str, Any]] | None:
     """Return (event_type, username, ip, fields) for a message we understand."""
     if prog == "sshd":
         if m := _FAILED.match(msg):
@@ -129,7 +131,7 @@ def parse_auth_line(
     if ts is None:
         return None
 
-    classified = _classify(m["prog"], m["msg"])
+    classified = classify_message(m["prog"], m["msg"])
     if classified is None:
         return None
     event_type, username, raw_ip, fields = classified

@@ -89,6 +89,22 @@ log source.
 
 `http_method`, `path`, `path_decoded`, `protocol`, `status`, `bytes`, `referrer`, `user_agent`
 
+**`journald` source**: the same `event_type`s and fields as `auth`, plus `unit`.
+
+**`windows` source**
+
+| `event_type` | Extra fields |
+|--------------|--------------|
+| `win_logon_failed`, `win_logon_success` | `logon_type`, `domain`, `workstation`, `auth_package`, `status`, `sub_status` |
+| `win_privileged_logon` | `domain` |
+| `win_user_created` | `created_by` (`username` is the new account) |
+| `win_group_member_added` | `group`, `member`, `member_sid` (`username` is who made the change) |
+| `win_service_installed` | `service_name`, `image_path`, `start_type` |
+| `win_scheduled_task_created` | `task_name` |
+| `win_audit_log_cleared` | none |
+
+All Windows events also carry `event_id` and `channel`. Details: [log-sources.md](log-sources.md).
+
 Prefer `path_decoded` for attack patterns: it is URL-decoded once, so `union%20select` becomes
 `union select`.
 

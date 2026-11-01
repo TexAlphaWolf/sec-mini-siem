@@ -1,0 +1,7 @@
+id: win-service-installed
+title: New Windows service installed
+description: A service was installed (event 7045). Malware and attackers use services to persist and to run code with high privileges. Check the image path.
+severity: medium
+tags: [attack.persistence, attack.privilege_escalation, attack.t1543.003]
+match:
+  event_type: win_service_installed

@@ -1,0 +1,7 @@
+id: win-user-created
+title: Local user account created
+description: A new Windows user account was created (event 4720). Attackers create accounts to keep access.
+severity: medium
+tags: [attack.persistence, attack.t1136.001]
+match:
+  event_type: win_user_created

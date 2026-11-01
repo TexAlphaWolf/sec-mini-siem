@@ -6,15 +6,16 @@
 
 ![Mini-SIEM dashboard](docs/dashboard.png)
 
-A small, readable SIEM. It parses Linux auth logs and web server access logs, detects attacks with
-Sigma-style YAML rules, stores everything in PostgreSQL, and shows alerts in a dashboard.
+A small, readable SIEM. It parses Linux auth logs (or the systemd journal), web server access logs
+and Windows security events, detects attacks with Sigma-style YAML rules, stores everything in
+PostgreSQL, and shows alerts in a dashboard.
 
 Built to be understood in an afternoon: about 1,200 lines of Python, no message queue, no
 framework magic.
 
 ## What it detects
 
-Eleven rules ship by default, each tagged with its MITRE ATT&CK technique:
+Nineteen rules ship by default, each tagged with its MITRE ATT&CK technique:
 
 | Rule | Severity | Detects |
 |------|----------|---------|
@@ -29,6 +30,14 @@ Eleven rules ship by default, each tagged with its MITRE ATT&CK technique:
 | `web-path-traversal` | high | `../`, `/etc/passwd` in a request |
 | `web-sqli-probe` | high | `union select` (also with SQL comments), `or 1=1`, `sleep(` in a request |
 | `web-scanner-user-agent` | medium | sqlmap, nikto, nmap, ... user agents |
+| `win-logon-bruteforce` | high | 5+ failed Windows logons from one IP in 60 s |
+| `win-password-spraying` | high | failed Windows logons for 5+ *different* accounts from one IP in 10 min |
+| `win-rdp-logon` | medium | successful Remote Desktop logon |
+| `win-user-created` | medium | new user account |
+| `win-admin-group-change` | high | account added to Administrators, Domain Admins, ... |
+| `win-audit-log-cleared` | high | an event log was cleared |
+| `win-service-installed` | medium | new Windows service |
+| `win-scheduled-task-created` | medium | new scheduled task |
 
 Adding your own takes a few lines of YAML: see [docs/writing-rules.md](docs/writing-rules.md).
 
@@ -55,10 +64,13 @@ cp .env.example .env            # then set POSTGRES_PASSWORD in .env
 docker compose up -d --build
 docker compose exec app minisiem ingest auth /data/auth.log --year 2026
 docker compose exec app minisiem ingest nginx /data/access.log
+docker compose exec app minisiem ingest journald /data/journal.jsonl
+docker compose exec app minisiem ingest windows /data/windows-security.jsonl
 ```
 
-Open <http://127.0.0.1:8000> (or the port you set in `MINISIEM_PORT`). The sample logs contain a brute-force run, user enumeration, a root
-login, failed `sudo` attempts, a directory scanner, and SQL injection and path traversal probes. They
+Open <http://127.0.0.1:8000> (or the port you set in `MINISIEM_PORT`). The sample logs contain a brute-force run, user enumeration, password spraying,
+a root login, failed `sudo` attempts, a directory scanner, SQL injection and path traversal probes,
+and a Remote Desktop break-in followed by a new administrator account, a service and a task. They
 use only [RFC 5737](https://datatracker.ietf.org/doc/html/rfc5737) documentation IP addresses.
 
 ### Troubleshooting
@@ -85,7 +97,9 @@ curl -X POST --data-binary @/var/log/auth.log \
 ```
 
 Syslog timestamps have no timezone: set `MINISIEM_LOG_TZ` (for example `Europe/Rome`) to match the
-machine that wrote the logs.
+machine that wrote the logs. Systemd hosts can send the journal instead
+(`journalctl -o json | minisiem ingest journald -`), and Windows events are exported with a short
+PowerShell command: see [docs/log-sources.md](docs/log-sources.md).
 
 ## Develop without Docker
 
@@ -124,7 +138,7 @@ Details and design decisions: [docs/architecture.md](docs/architecture.md).
 |--------|------|-------------|
 | `GET` | `/` | Dashboard |
 | `GET` | `/health` | Liveness and number of loaded rules |
-| `POST` | `/ingest/{source}` | Ingest raw lines (`auth` or `nginx`), body is `text/plain` |
+| `POST` | `/ingest/{source}` | Ingest raw lines (`auth`, `nginx`, `journald` or `windows`), body is `text/plain` |
 | `GET` | `/api/alerts` | Alerts; filters `severity`, `rule_id`, `limit` |
 | `GET` | `/api/events` | Events; filters `source`, `event_type`, `src_ip`, `limit` |
 | `GET` | `/api/stats` | Totals, alerts by severity, top sources and rules, hourly timeline |
@@ -154,7 +168,8 @@ Only run it against logs from systems you own or are authorised to monitor.
 
 - Run a single worker: detection windows live in memory. After a restart they are rebuilt from
   the stored events, so an attack in progress keeps its count and is not alerted twice.
-- Parsers cover `sshd`, `sudo` and the nginx/Apache combined format.
+- Parsers cover `sshd` and `sudo` (auth.log or journald), the nginx/Apache combined format and a
+  set of Windows Security and System events (see [docs/log-sources.md](docs/log-sources.md)).
 - Retention is off by default: set `MINISIEM_RETENTION_DAYS` or run `minisiem purge --days N`.
 
 ## Roadmap
@@ -162,7 +177,7 @@ Only run it against logs from systems you own or are authorised to monitor.
 - [ ] Notifications (Telegram, email) when an alert fires
 - [ ] GeoIP enrichment of source addresses
 - [x] "Distinct values" thresholds (for example 5 different usernames from one IP)
-- [ ] Windows Event Log and journald parsers
+- [x] Windows Event Log and journald parsers
 - [x] Persist detection state across restarts
 - [x] Export the rules in Sigma format
 
@@ -173,7 +188,7 @@ rules/               detection rules (YAML)
 sample_logs/         anonymised demo logs
 scripts/             sample log generator
 src/minisiem/
-  parsers/           auth.log and access.log parsers
+  parsers/           auth.log, access.log, journald and Windows event parsers
   rules.py           rule loading and the detection engine
   pipeline.py        parse -> detect -> store
   api.py             FastAPI app
@@ -181,7 +196,7 @@ src/minisiem/
   cli.py             minisiem serve | ingest | purge | rules check
   static/            dashboard (HTML, CSS, JS)
 tests/               pytest suite
-docs/                architecture and rule-writing guide
+docs/                architecture, rule-writing guide, log sources
 ```
 
 ## License

@@ -1,0 +1,8 @@
+id: win-rdp-logon
+title: Successful Remote Desktop logon
+description: A user logged on through Remote Desktop (logon type 10, RemoteInteractive). Expected on some machines, but worth knowing about, especially when the source IP is not on your network.
+severity: medium
+tags: [attack.lateral_movement, attack.t1021.001]
+match:
+  event_type: win_logon_success
+  logon_type: 10

@@ -1,0 +1,11 @@
+id: win-scheduled-task-created
+title: Scheduled task created
+description: A scheduled task was created (event 4698). Software installers create tasks too, so this alerts once per host and ten minutes rather than once per task.
+severity: medium
+tags: [attack.persistence, attack.execution, attack.t1053.005]
+match:
+  event_type: win_scheduled_task_created
+threshold:
+  count: 1
+  window: 10m
+  group_by: host

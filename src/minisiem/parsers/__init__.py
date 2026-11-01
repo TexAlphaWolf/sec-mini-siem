@@ -7,11 +7,15 @@ from datetime import UTC, datetime
 
 from ..events import Event
 from .auth import parse_auth_line
+from .journald import parse_journald_line
 from .nginx import parse_nginx_line
+from .windows import parse_windows_line
 
 PARSERS = {
     "auth": parse_auth_line,
     "nginx": parse_nginx_line,
+    "journald": parse_journald_line,
+    "windows": parse_windows_line,
 }
 
 
