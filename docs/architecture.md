@@ -53,6 +53,22 @@ and age, applies the per-minute limit and delivers on its own thread through a b
 slow or broken channel can never delay or lose ingestion. GeoIP is looked up at read time (API)
 and at send time (notifications) from a local MaxMind file; nothing is stored in the database.
 
+## Changing the schema
+
+The schema is versioned with Alembic (`src/minisiem/migrations/`). `init_db` runs at startup and
+upgrades the database to the latest revision; on PostgreSQL it holds an advisory lock so several
+containers starting together do not race. A database created by version 0.1.0 (no
+`alembic_version` table) is stamped as revision `0001` and then upgraded, keeping its data.
+
+To change the schema, edit the models in `db.py`, then generate a migration and review it:
+
+```bash
+alembic revision --autogenerate -m "describe the change" --rev-id 0002
+minisiem db current     # revision of the configured database and the latest one
+```
+
+A test compares the migrated schema with the models and fails if they drift apart.
+
 ## Known limitations
 
 - **Detection state is in memory.** Sliding windows live in the process, so run a single worker;

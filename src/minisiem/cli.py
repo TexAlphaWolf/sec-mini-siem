@@ -1,4 +1,4 @@
-"""Command line interface: serve, ingest, purge, notify-test and the rules commands."""
+"""Command line interface: serve, ingest, purge, db, notify-test and the rules commands."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import time
 from pathlib import Path
 
 from .config import load_settings
-from .db import init_db, make_session_factory
+from .db import current_revision, head_revision, init_db, make_session_factory
 from .geo import GeoIP
 from .notify import build_notifier
 from .parsers import PARSERS
-from .pipeline import Pipeline
+from .pipeline import IngestResult, Pipeline
 from .retention import purge_older_than
 from .rules import RuleError, load_rules
 from .sigma import export_sigma
@@ -23,6 +23,19 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     # One worker on purpose: detection state is kept in memory (see docs/architecture.md).
     uvicorn.run("minisiem.api:create_app", factory=True, host=args.host, port=args.port, workers=1)
+    return 0
+
+
+def _cmd_db(args: argparse.Namespace) -> int:
+    engine, _ = make_session_factory(load_settings().database_url)
+    try:
+        if args.db_command == "upgrade":
+            init_db(engine)
+            print(f"database is at revision {current_revision(engine)}")
+        else:
+            print(f"current={current_revision(engine) or 'none'} head={head_revision()}")
+    finally:
+        engine.dispose()
     return 0
 
 
@@ -143,7 +156,7 @@ def _cmd_purge(args: argparse.Namespace) -> int:
 
 
 def _ingest(args: argparse.Namespace, pipeline: Pipeline) -> int:
-    def report(result) -> None:  # noqa: ANN001
+    def report(result: IngestResult) -> None:
         print(f"parsed={result.parsed} skipped={result.skipped} alerts={result.alerts}")
 
     if args.file == "-":
@@ -198,6 +211,13 @@ def build_parser() -> argparse.ArgumentParser:
     purge.add_argument("--days", type=int, help="age limit (default: $MINISIEM_RETENTION_DAYS)")
     purge.set_defaults(func=_cmd_purge)
 
+    database = sub.add_parser("db", help="database schema (migrations)")
+    database_sub = database.add_subparsers(dest="db_command", required=True)
+    upgrade = database_sub.add_parser("upgrade", help="migrate to the latest schema")
+    upgrade.set_defaults(func=_cmd_db)
+    current = database_sub.add_parser("current", help="show the schema revision")
+    current.set_defaults(func=_cmd_db)
+
     rules = sub.add_parser("rules", help="work with detection rules")
     rules_sub = rules.add_subparsers(dest="rules_command", required=True)
     check = rules_sub.add_parser("check", help="validate rule files")
@@ -216,7 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    return int(args.func(args))
 
 
 if __name__ == "__main__":

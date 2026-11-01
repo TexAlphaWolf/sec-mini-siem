@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from minisiem.db import Base
 
@@ -34,6 +34,8 @@ def database_url(tmp_path) -> str:
         return f"sqlite:///{tmp_path / 'test.db'}"
     engine = create_engine(url)
     Base.metadata.drop_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
     engine.dispose()
     return url
 

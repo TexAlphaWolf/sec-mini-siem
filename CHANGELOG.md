@@ -4,9 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-01
 
 ### Added
+- Database migrations with Alembic. The schema is created and upgraded automatically at startup
+  (guarded by a PostgreSQL advisory lock); databases made by 0.1.0 are adopted without data loss.
+  `minisiem db upgrade` and `minisiem db current` run it by hand
+- Static type checking with mypy, run in CI
+- Animated demo of the dashboard in the README
 - Notifications to Telegram, a webhook (`json` or `discord`) and email, with a severity filter,
   an age filter, a per-minute limit and `minisiem notify-test`
 - GeoIP: country, city and network owner of public source addresses in alerts and top sources,
@@ -42,6 +47,7 @@ All notable changes to this project are documented here. The format follows
 - GitHub Actions updated to versions that run on Node.js 24
 
 ### Fixed
+- The access-token form of the dashboard was visible even when no token is required
 - The app now releases its database connection when startup fails (for example on a bad setting)
 - `web-sqli-probe` now catches comment-based evasion (`UNION/**/SELECT`) and no longer fires on
   ordinary text such as "credit union selection" or "color 1=1"

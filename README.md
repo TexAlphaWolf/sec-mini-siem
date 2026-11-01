@@ -4,7 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 
-![Mini-SIEM dashboard](docs/dashboard.png)
+![Mini-SIEM dashboard demo](docs/demo.gif)
+
+[Full-size screenshot](docs/dashboard.png)
 
 A small, readable SIEM. It parses Linux auth logs (or the systemd journal), web server access logs
 and Windows security events, detects attacks with Sigma-style YAML rules, stores everything in
@@ -127,7 +129,9 @@ pip install -e ".[dev]"
 pytest --cov                # tests and coverage; SQLite by default,
                             # TEST_DATABASE_URL=postgresql+psycopg://... for PostgreSQL
 ruff check .
+mypy                        # static type check
 minisiem rules check        # validate rules
+minisiem db current         # schema revision of the configured database
 minisiem rules export       # the same rules as Sigma (see docs/writing-rules.md)
 minisiem serve              # SQLite file by default; http://127.0.0.1:8000
 ```
@@ -191,6 +195,8 @@ Only run it against logs from systems you own or are authorised to monitor.
   the stored events, so an attack in progress keeps its count and is not alerted twice.
 - Parsers cover `sshd` and `sudo` (auth.log or journald), the nginx/Apache combined format and a
   set of Windows Security and System events (see [docs/log-sources.md](docs/log-sources.md)).
+- Schema changes are managed by Alembic and applied automatically at startup (see
+  [docs/architecture.md](docs/architecture.md#changing-the-schema)).
 - Retention is off by default: set `MINISIEM_RETENTION_DAYS` or run `minisiem purge --days N`.
 
 ## Roadmap
@@ -201,6 +207,7 @@ Only run it against logs from systems you own or are authorised to monitor.
 - [x] Windows Event Log and journald parsers
 - [x] Persist detection state across restarts
 - [x] Export the rules in Sigma format
+- [x] Database migrations (Alembic) and static typing (mypy)
 
 ## Project layout
 

@@ -23,6 +23,7 @@ jobs:
           cache: pip
       - run: pip install -e ".[dev]"
       - run: ruff check .
+      - run: mypy
       - run: minisiem rules check rules
       - run: pytest -q --cov
 

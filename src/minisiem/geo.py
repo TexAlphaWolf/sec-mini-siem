@@ -22,7 +22,7 @@ def _name(node: Any) -> str | None:
     if isinstance(node, dict):
         names = node.get("names")
         if isinstance(names, dict) and isinstance(names.get("en"), str):
-            return names["en"][:_MAX_TEXT]
+            return str(names["en"])[:_MAX_TEXT]
     return None
 
 

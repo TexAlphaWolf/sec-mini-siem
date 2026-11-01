@@ -130,6 +130,12 @@ def test_dashboard_never_renders_log_data_as_html():
         assert forbidden not in js
 
 
+def test_hidden_attribute_is_not_overridden_by_css():
+    # `.row { display: flex }` once made the hidden login form visible without any token.
+    css = (STATIC_DIR / "dashboard.css").read_text(encoding="utf-8")
+    assert "[hidden] { display: none !important; }" in css
+
+
 def test_dashboard_is_served_with_security_headers(client):
     response = client.get("/")
     assert response.status_code == 200

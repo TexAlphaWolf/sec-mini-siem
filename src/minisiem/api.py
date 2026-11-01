@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -13,9 +13,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import desc, func, select
+from sqlalchemy.orm import sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from . import __version__
@@ -101,7 +102,7 @@ def require_read_token(request: Request) -> None:
     _check_bearer(request, request.app.state.settings.read_token)
 
 
-async def _purge_once(session_factory, days: int) -> None:  # noqa: ANN001
+async def _purge_once(session_factory: sessionmaker, days: int) -> None:
     """One retention pass; a failure is logged, never fatal."""
     try:
         events, alerts = await run_in_threadpool(purge_older_than, session_factory, days)
@@ -111,7 +112,7 @@ async def _purge_once(session_factory, days: int) -> None:  # noqa: ANN001
         log.exception("retention purge failed")
 
 
-async def _retention_loop(session_factory, days: int) -> None:  # noqa: ANN001
+async def _retention_loop(session_factory: sessionmaker, days: int) -> None:
     """Repeat the purge once an hour (the first pass runs at startup)."""
     while True:
         await asyncio.sleep(RETENTION_INTERVAL_SECONDS)
@@ -160,7 +161,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Mini-SIEM", version=__version__, lifespan=lifespan)
 
     @app.middleware("http")
-    async def add_security_headers(request: Request, call_next):  # noqa: ANN001, ANN202
+    async def add_security_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         response = await call_next(request)
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)

@@ -62,20 +62,20 @@ class Condition:
 def _compare(op: str, actual: Any, expected: Any) -> bool:
     if op in ("gte", "lte"):
         try:
-            left, right = float(actual), float(expected)
+            number, limit = float(actual), float(expected)
         except (TypeError, ValueError):
             return False
-        return left >= right if op == "gte" else left <= right
+        return number >= limit if op == "gte" else number <= limit
     if op == "re":
         return expected.search(str(actual)) is not None
-    left, right = str(actual).lower(), str(expected).lower()
+    text, wanted = str(actual).lower(), str(expected).lower()
     if op == "contains":
-        return right in left
+        return wanted in text
     if op == "startswith":
-        return left.startswith(right)
+        return text.startswith(wanted)
     if op == "endswith":
-        return left.endswith(right)
-    return left == right
+        return text.endswith(wanted)
+    return text == wanted
 
 
 @dataclass(frozen=True)
