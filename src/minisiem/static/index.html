@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini-SIEM</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <script src="/static/dashboard.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Mini-SIEM</h1>
+    <span id="status" class="muted" role="status">loading…</span>
+  </header>
+
+  <main>
+    <section id="cards" class="cards" aria-label="Summary"></section>
+
+    <section>
+      <h2>Alerts per hour</h2>
+      <svg id="timeline" viewBox="0 0 600 120" preserveAspectRatio="none" role="img"
+           aria-label="Alerts per hour"></svg>
+    </section>
+
+    <div class="columns">
+      <section>
+        <h2>Top sources</h2>
+        <table id="sources"><thead><tr><th>Source IP</th><th>Alerts</th></tr></thead><tbody></tbody></table>
+      </section>
+      <section>
+        <h2>Top rules</h2>
+        <table id="rules"><thead><tr><th>Rule</th><th>Alerts</th></tr></thead><tbody></tbody></table>
+      </section>
+    </div>
+
+    <section>
+      <div class="row">
+        <h2>Latest alerts</h2>
+        <label class="muted">Severity
+          <select id="severity">
+            <option value="">all</option>
+            <option>critical</option>
+            <option>high</option>
+            <option>medium</option>
+            <option>low</option>
+          </select>
+        </label>
+      </div>
+      <table id="alerts">
+        <thead><tr><th>Time</th><th>Severity</th><th>Rule</th><th>Source IP</th><th>Events</th><th>Details</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,12 @@
+id: ssh-root-attempts
+title: Repeated failed SSH logins for root
+description: Several failed password logins for the root account from one source IP.
+severity: medium
+tags: [attack.credential_access, attack.t1110]
+match:
+  event_type: ssh_failed_password
+  username: root
+threshold:
+  count: 3
+  window: 5m
+  group_by: src_ip

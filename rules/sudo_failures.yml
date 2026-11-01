@@ -1,0 +1,11 @@
+id: sudo-repeated-failures
+title: Repeated sudo failures
+description: The same user failed sudo authentication several times in a short period.
+severity: medium
+tags: [attack.privilege_escalation, attack.t1548.003]
+match:
+  event_type: sudo_failure
+threshold:
+  count: 3
+  window: 10m
+  group_by: username

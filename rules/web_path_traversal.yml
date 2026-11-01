@@ -1,0 +1,17 @@
+id: web-path-traversal
+title: Path traversal attempt
+description: A request tries to climb out of the web root or read system files.
+severity: high
+tags: [attack.initial_access, attack.t1190]
+match:
+  event_type: http_request
+  path_decoded|contains:
+    - ../
+    - ..\
+    - /etc/passwd
+    - /etc/shadow
+# One alert per source IP per 5 minutes, so a scan does not bury the dashboard.
+threshold:
+  count: 1
+  window: 5m
+  group_by: src_ip

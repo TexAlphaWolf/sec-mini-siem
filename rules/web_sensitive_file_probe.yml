@@ -1,0 +1,17 @@
+id: web-sensitive-file-probe
+title: Probe for sensitive files or admin panels
+description: Repeated requests for files that should never be public (.env, .git) or for common admin and CMS endpoints.
+severity: medium
+tags: [attack.reconnaissance, attack.t1595.002]
+match:
+  event_type: http_request
+  path_decoded|contains:
+    - /.env
+    - /.git/
+    - /wp-login.php
+    - /xmlrpc.php
+    - /phpmyadmin
+threshold:
+  count: 3
+  window: 5m
+  group_by: src_ip

@@ -1,0 +1,12 @@
+id: web-scanner-404
+title: Web scanner (burst of 404s)
+description: One source IP requested many non-existent pages in a minute, which is typical of directory brute-forcing.
+severity: medium
+tags: [attack.reconnaissance, attack.t1595]
+match:
+  event_type: http_request
+  status: 404
+threshold:
+  count: 20
+  window: 60s
+  group_by: src_ip

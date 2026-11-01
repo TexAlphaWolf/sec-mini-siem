@@ -1,0 +1,20 @@
+id: web-scanner-user-agent
+title: Known scanner user agent
+description: The client identifies itself as a well-known scanning tool. Expect this from your own scans too.
+severity: medium
+tags: [attack.reconnaissance, attack.t1595]
+match:
+  event_type: http_request
+  user_agent|contains:
+    - sqlmap
+    - nikto
+    - nmap
+    - masscan
+    - gobuster
+    - dirbuster
+    - wpscan
+# One alert per source IP per 10 minutes, instead of one per request.
+threshold:
+  count: 1
+  window: 10m
+  group_by: src_ip

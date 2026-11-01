@@ -1,0 +1,8 @@
+id: ssh-root-login
+title: Successful SSH login as root
+description: Direct root login over SSH. Disable it with "PermitRootLogin no" unless you have a reason.
+severity: medium
+tags: [attack.initial_access, attack.t1078]
+match:
+  event_type: ssh_accepted
+  username: root

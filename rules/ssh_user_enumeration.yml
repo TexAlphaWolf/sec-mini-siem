@@ -1,0 +1,11 @@
+id: ssh-user-enumeration
+title: SSH user enumeration
+description: Several login attempts for accounts that do not exist, from one source IP. Usually an attacker guessing valid usernames.
+severity: medium
+tags: [attack.discovery, attack.t1087]
+match:
+  event_type: ssh_invalid_user
+threshold:
+  count: 3
+  window: 5m
+  group_by: src_ip
