@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from .db import AlertRow, EventRow
 from .events import Event
+from .notify import Notifier
 from .parsers import parse_lines
 from .rules import Rule, RuleEngine
 
@@ -30,8 +31,15 @@ class Pipeline:
     A lock serialises ingestion because the web server handles requests in a thread pool.
     """
 
-    def __init__(self, session_factory: sessionmaker, rules: list[Rule], tz: str = "UTC") -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker,
+        rules: list[Rule],
+        tz: str = "UTC",
+        notifier: Notifier | None = None,
+    ) -> None:
         self._session_factory = session_factory
+        self._notifier = notifier
         self._engine = RuleEngine(rules)
         self._tz = tz
         self._lock = threading.Lock()
@@ -129,4 +137,6 @@ class Pipeline:
                 )
                 for a in alerts
             )
+        if self._notifier is not None and alerts:
+            self._notifier.submit(alerts)  # after the commit: a stored alert is never lost
         return IngestResult(parsed=len(events), skipped=skipped, alerts=len(alerts))

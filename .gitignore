@@ -6,6 +6,9 @@ secrets/
 *.db
 *.sqlite
 
+# GeoIP databases are licensed by MaxMind and must not be redistributed
+geoip/*.mmdb
+
 # Python
 __pycache__/
 *.pyc

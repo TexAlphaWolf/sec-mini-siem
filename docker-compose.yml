@@ -40,9 +40,27 @@ services:
       MINISIEM_API_TOKEN: ${MINISIEM_API_TOKEN:-}
       MINISIEM_READ_TOKEN: ${MINISIEM_READ_TOKEN:-}
       MINISIEM_RETENTION_DAYS: ${MINISIEM_RETENTION_DAYS:-0}
+      MINISIEM_GEOIP_DB: ${MINISIEM_GEOIP_DB:-}
+      MINISIEM_GEOIP_ASN_DB: ${MINISIEM_GEOIP_ASN_DB:-}
+      MINISIEM_NOTIFY_MIN_SEVERITY: ${MINISIEM_NOTIFY_MIN_SEVERITY:-high}
+      MINISIEM_NOTIFY_MAX_AGE_MINUTES: ${MINISIEM_NOTIFY_MAX_AGE_MINUTES:-60}
+      MINISIEM_NOTIFY_MAX_PER_MINUTE: ${MINISIEM_NOTIFY_MAX_PER_MINUTE:-20}
+      MINISIEM_TELEGRAM_TOKEN: ${MINISIEM_TELEGRAM_TOKEN:-}
+      MINISIEM_TELEGRAM_CHAT_ID: ${MINISIEM_TELEGRAM_CHAT_ID:-}
+      MINISIEM_WEBHOOK_URL: ${MINISIEM_WEBHOOK_URL:-}
+      MINISIEM_WEBHOOK_TOKEN: ${MINISIEM_WEBHOOK_TOKEN:-}
+      MINISIEM_WEBHOOK_FORMAT: ${MINISIEM_WEBHOOK_FORMAT:-json}
+      MINISIEM_SMTP_HOST: ${MINISIEM_SMTP_HOST:-}
+      MINISIEM_SMTP_PORT: ${MINISIEM_SMTP_PORT:-587}
+      MINISIEM_SMTP_SECURITY: ${MINISIEM_SMTP_SECURITY:-starttls}
+      MINISIEM_SMTP_USER: ${MINISIEM_SMTP_USER:-}
+      MINISIEM_SMTP_PASSWORD: ${MINISIEM_SMTP_PASSWORD:-}
+      MINISIEM_SMTP_FROM: ${MINISIEM_SMTP_FROM:-}
+      MINISIEM_SMTP_TO: ${MINISIEM_SMTP_TO:-}
     volumes:
       - ./rules:/app/rules:ro        # edit a rule, then restart the app
       - ./sample_logs:/data:ro       # demo logs
+      - ./geoip:/geoip:ro            # optional GeoLite2 databases (see docs/configuration.md)
     ports:
       # Bound to localhost on purpose: put a reverse proxy with TLS and auth in front to expose it.
       # The host port is configurable (MINISIEM_PORT in .env) for machines where 8000 is taken.

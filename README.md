@@ -101,6 +101,24 @@ machine that wrote the logs. Systemd hosts can send the journal instead
 (`journalctl -o json | minisiem ingest journald -`), and Windows events are exported with a short
 PowerShell command: see [docs/log-sources.md](docs/log-sources.md).
 
+## Get alerts on your phone
+
+Alerts can be sent to Telegram, to a webhook (Slack, Mattermost, Discord, your own service) and
+by email. Set the channel in `.env`, then test it:
+
+```bash
+docker compose exec app minisiem notify-test
+```
+
+Only recent, high-severity alerts are sent, and at most 20 messages a minute, so importing an old
+log file cannot flood your phone. All settings: [docs/configuration.md](docs/configuration.md).
+
+## See where attackers come from
+
+With a free MaxMind GeoLite2 database in `geoip/`, alerts and the top-sources table show the
+country of each public address. The lookup is local; no address leaves your machine. Setup is in
+[docs/configuration.md](docs/configuration.md#geoip).
+
 ## Develop without Docker
 
 ```bash
@@ -154,6 +172,9 @@ This is a tool for watching hostile traffic, so it is built to be safe to run ne
   fails the build if `innerHTML` or similar DOM APIs appear.
 - **Local by default.** `docker-compose.yml` binds to `127.0.0.1`. Put a reverse proxy with TLS
   in front before exposing the service.
+- **Alert messages are plain text.** Log data is stripped of control characters and cut short
+  before it goes into Telegram, webhook or email messages; failed deliveries are logged without
+  URLs or credentials.
 - **Optional tokens.** `MINISIEM_API_TOKEN` requires a bearer token on `POST /ingest`;
   `MINISIEM_READ_TOKEN` does the same for `GET /api/*`, and the dashboard then asks for it.
 - **Bounded input.** Request bodies are capped at 5 MB and read as a stream.
@@ -174,8 +195,8 @@ Only run it against logs from systems you own or are authorised to monitor.
 
 ## Roadmap
 
-- [ ] Notifications (Telegram, email) when an alert fires
-- [ ] GeoIP enrichment of source addresses
+- [x] Notifications (Telegram, webhook, email) when an alert fires
+- [x] GeoIP enrichment of source addresses
 - [x] "Distinct values" thresholds (for example 5 different usernames from one IP)
 - [x] Windows Event Log and journald parsers
 - [x] Persist detection state across restarts
@@ -193,10 +214,12 @@ src/minisiem/
   pipeline.py        parse -> detect -> store
   api.py             FastAPI app
   retention.py       delete events and alerts older than N days
+  notify.py          Telegram, webhook and email notifications
+  geo.py             GeoIP lookups (MaxMind GeoLite2, local)
   cli.py             minisiem serve | ingest | purge | rules check
   static/            dashboard (HTML, CSS, JS)
 tests/               pytest suite
-docs/                architecture, rule-writing guide, log sources
+docs/                architecture, rule writing, log sources, configuration
 ```
 
 ## License

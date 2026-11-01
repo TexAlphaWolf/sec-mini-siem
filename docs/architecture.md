@@ -46,6 +46,13 @@ it is evaluated.
 **Naive UTC everywhere.** Timestamps are converted to UTC on parse and stored without a zone, so
 SQLite and PostgreSQL behave the same. The API adds a `Z` suffix.
 
+## Notifications and GeoIP
+
+After a batch of alerts is stored, the pipeline hands them to a `Notifier`. It filters by severity
+and age, applies the per-minute limit and delivers on its own thread through a bounded queue, so a
+slow or broken channel can never delay or lose ingestion. GeoIP is looked up at read time (API)
+and at send time (notifications) from a local MaxMind file; nothing is stored in the database.
+
 ## Known limitations
 
 - **Detection state is in memory.** Sliding windows live in the process, so run a single worker;

@@ -21,6 +21,8 @@ from starlette.concurrency import run_in_threadpool
 from . import __version__
 from .config import Settings, load_settings
 from .db import AlertRow, EventRow, init_db, make_session_factory
+from .geo import GeoIP
+from .notify import Notifier, build_notifier
 from .parsers import PARSERS
 from .pipeline import Pipeline
 from .retention import purge_older_than
@@ -59,7 +61,7 @@ def _event_dict(row: EventRow) -> dict[str, Any]:
     }
 
 
-def _alert_dict(row: AlertRow) -> dict[str, Any]:
+def _alert_dict(row: AlertRow, geo: GeoIP | None = None) -> dict[str, Any]:
     return {
         "id": row.id,
         "ts": _iso(row.ts),
@@ -71,6 +73,7 @@ def _alert_dict(row: AlertRow) -> dict[str, Any]:
         "event_count": row.event_count,
         "tags": row.tags,
         "details": row.details,
+        "geo": geo.lookup(row.src_ip) if geo else None,
     }
 
 
@@ -121,23 +124,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine, session_factory = make_session_factory(settings.database_url)
-        init_db(engine)
-        rules = load_rules(settings.rules_dir)  # fail fast on a broken rule
-        app.state.settings = settings
-        app.state.session_factory = session_factory
-        app.state.pipeline = Pipeline(session_factory, rules, settings.log_timezone)
-        # Pick up where the previous process left off (windows and silenced groups).
-        await run_in_threadpool(app.state.pipeline.restore_state)
-        purger = None
-        if settings.retention_days > 0:
-            # The first purge runs before the app accepts requests.
-            await _purge_once(session_factory, settings.retention_days)
-            purger = asyncio.create_task(_retention_loop(session_factory, settings.retention_days))
+        geo: GeoIP | None = None
+        notifier: Notifier | None = None
+        purger: asyncio.Task | None = None
         try:
+            init_db(engine)
+            rules = load_rules(settings.rules_dir)  # fail fast on a broken rule
+            geo = GeoIP.open(settings.geoip_db, settings.geoip_asn_db)  # ... on a bad database
+            notifier = build_notifier(settings.notify, geo)  # ... and on half-set channels
+            app.state.settings = settings
+            app.state.session_factory = session_factory
+            app.state.geo = geo
+            app.state.notifier = notifier
+            app.state.pipeline = Pipeline(session_factory, rules, settings.log_timezone, notifier)
+            if notifier is not None:
+                notifier.start()
+            # Pick up where the previous process left off (windows and silenced groups).
+            await run_in_threadpool(app.state.pipeline.restore_state)
+            if settings.retention_days > 0:
+                # The first purge runs before the app accepts requests.
+                await _purge_once(session_factory, settings.retention_days)
+                purger = asyncio.create_task(
+                    _retention_loop(session_factory, settings.retention_days)
+                )
             yield
         finally:
             if purger is not None:
                 purger.cancel()
+            if notifier is not None:
+                notifier.close()
+            if geo is not None:
+                geo.close()
             engine.dispose()
 
     app = FastAPI(title="Mini-SIEM", version=__version__, lifespan=lifespan)
@@ -215,8 +232,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             query = query.where(AlertRow.severity == severity)
         if rule_id:
             query = query.where(AlertRow.rule_id == rule_id)
+        geo = request.app.state.geo
         with request.app.state.session_factory() as session:
-            return [_alert_dict(row) for row in session.scalars(query)]
+            return [_alert_dict(row, geo) for row in session.scalars(query)]
 
     @app.get("/api/stats", dependencies=[Depends(require_read_token)])
     def stats(request: Request, hours: int = Query(24, ge=1, le=168)) -> dict[str, Any]:
@@ -230,8 +248,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             }
             count = func.count().label("n")
+            geo = request.app.state.geo
             top_sources = [
-                {"src_ip": ip, "alerts": n}
+                {"src_ip": ip, "alerts": n, "geo": geo.lookup(ip) if geo else None}
                 for ip, n in session.execute(
                     select(AlertRow.src_ip, count)
                     .where(AlertRow.src_ip.is_not(None))

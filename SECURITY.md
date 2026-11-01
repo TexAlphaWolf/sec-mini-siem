@@ -39,4 +39,7 @@ These are documented design limits, listed in the README:
 - A strict Content-Security-Policy and other security headers on every response.
 - Request bodies are size-limited; the optional ingest and read tokens are compared in constant
   time, and the dashboard keeps its token only in `sessionStorage` (forgotten when the tab closes).
+- Notifications are plain text built from sanitised values; webhooks do not follow redirects, and
+  delivery errors are logged without URLs or credentials. Secrets (bot token, SMTP password) are
+  read from the environment and never written to the database.
 - CI runs CodeQL and `pip-audit`, and Dependabot proposes dependency updates.

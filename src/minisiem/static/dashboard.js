@@ -93,6 +93,12 @@
     }
   }
 
+  // "203.0.113.5 (DE)" when a GeoIP database is configured, just the address otherwise.
+  function withCountry(ip, geo) {
+    const code = geo && geo.country_code ? ` (${geo.country_code})` : "";
+    return `${ip || "-"}${code}`;
+  }
+
   function alertRow(alert) {
     const details = el("td");
     const wrap = el("details");
@@ -105,7 +111,7 @@
     const rule = el("td");
     rule.append(el("div", alert.title), el("div", alert.rule_id, "muted"));
 
-    return [localTime(alert.ts), sev, rule, alert.src_ip || "-", alert.event_count, details];
+    return [localTime(alert.ts), sev, rule, withCountry(alert.src_ip, alert.geo), alert.event_count, details];
   }
 
   async function refresh() {
@@ -115,7 +121,7 @@
       const [stats, alerts] = await Promise.all([getJSON("/api/stats?hours=24"), getJSON(alertsUrl)]);
       renderCards(stats);
       renderTimeline(stats.timeline);
-      fillTable("sources", stats.top_sources.map((s) => [s.src_ip, s.alerts]));
+      fillTable("sources", stats.top_sources.map((s) => [withCountry(s.src_ip, s.geo), s.alerts]));
       fillTable("rules", stats.top_rules.map((r) => [r.title, r.alerts]));
       fillTable("alerts", alerts.map(alertRow));
       $("login").hidden = true;

@@ -1,4 +1,4 @@
-"""Command line interface: `minisiem serve | ingest | purge | rules check | rules export`."""
+"""Command line interface: serve, ingest, purge, notify-test and the rules commands."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from pathlib import Path
 
 from .config import load_settings
 from .db import init_db, make_session_factory
+from .geo import GeoIP
+from .notify import build_notifier
 from .parsers import PARSERS
 from .pipeline import Pipeline
 from .retention import purge_older_than
@@ -22,6 +24,27 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     # One worker on purpose: detection state is kept in memory (see docs/architecture.md).
     uvicorn.run("minisiem.api:create_app", factory=True, host=args.host, port=args.port, workers=1)
     return 0
+
+
+def _cmd_notify_test(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    geo = None
+    try:
+        notifier = build_notifier(settings.notify, geo)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if notifier is None:
+        print(
+            "error: no notification channel is configured (see docs/configuration.md)",
+            file=sys.stderr,
+        )
+        return 1
+    failed = 0
+    for name, error in notifier.send_test():
+        print(f"{name}: {'sent' if error is None else 'FAILED (' + error + ')'}")
+        failed += error is not None
+    return 1 if failed else 0
 
 
 def _cmd_rules_check(args: argparse.Namespace) -> int:
@@ -77,11 +100,29 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     except RuleError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+
+    # Alerts are only announced while following a file: a one-off import is history.
+    geo = notifier = None
+    if args.follow:
+        try:
+            geo = GeoIP.open(settings.geoip_db, settings.geoip_asn_db)
+            notifier = build_notifier(settings.notify, geo)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
     engine, session_factory = make_session_factory(settings.database_url)
     try:
         init_db(engine)
-        return _ingest(args, Pipeline(session_factory, rules, settings.log_timezone))
+        pipeline = Pipeline(session_factory, rules, settings.log_timezone, notifier)
+        if notifier is not None:
+            notifier.start()
+        return _ingest(args, pipeline)
     finally:
+        if notifier is not None:
+            notifier.close()
+        if geo is not None:
+            geo.close()
         engine.dispose()
 
 
@@ -149,6 +190,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.add_argument("--year", type=int, help="year for syslog lines (default: current year)")
     ingest.set_defaults(func=_cmd_ingest)
+
+    notify = sub.add_parser("notify-test", help="send a test message on every configured channel")
+    notify.set_defaults(func=_cmd_notify_test)
 
     purge = sub.add_parser("purge", help="delete events and alerts older than N days")
     purge.add_argument("--days", type=int, help="age limit (default: $MINISIEM_RETENTION_DAYS)")

@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Notifications to Telegram, a webhook (`json` or `discord`) and email, with a severity filter,
+  an age filter, a per-minute limit and `minisiem notify-test`
+- GeoIP: country, city and network owner of public source addresses in alerts and top sources,
+  from a local MaxMind GeoLite2 database (`MINISIEM_GEOIP_DB`)
+- `docs/configuration.md`: every setting in one place
 - `journald` source (`journalctl -o json`): sshd and sudo events, read by the same rules as `auth`
 - `windows` source: Security and System events as JSON lines (PowerShell export or Winlogbeat)
   and eight `win-*` rules: logon brute force and spraying, Remote Desktop logon, new user,
@@ -37,6 +42,7 @@ All notable changes to this project are documented here. The format follows
 - GitHub Actions updated to versions that run on Node.js 24
 
 ### Fixed
+- The app now releases its database connection when startup fails (for example on a bad setting)
 - `web-sqli-probe` now catches comment-based evasion (`UNION/**/SELECT`) and no longer fires on
   ordinary text such as "credit union selection" or "color 1=1"
 - A log line containing a NUL byte made PostgreSQL reject the whole batch, which could be abused
