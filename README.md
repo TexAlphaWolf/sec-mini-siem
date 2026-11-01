@@ -1,5 +1,9 @@
 # Mini-SIEM
 
+[![CI](https://github.com/TexAlphaWolf/sec-mini-siem/actions/workflows/ci.yml/badge.svg)](https://github.com/TexAlphaWolf/sec-mini-siem/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+
 ![Mini-SIEM dashboard](docs/dashboard.png)
 
 A small, readable SIEM. It parses Linux auth logs and web server access logs, detects attacks with
