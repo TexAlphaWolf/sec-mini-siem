@@ -46,7 +46,9 @@ class _Recorder(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         length = int(self.headers.get("content-length", 0))
         body = self.rfile.read(length)
-        self.server.requests.append({"path": self.path, "headers": dict(self.headers), "body": body})
+        self.server.requests.append(
+            {"path": self.path, "headers": dict(self.headers), "body": body}
+        )
         if self.server.redirect:
             self.send_response(302)
             self.send_header("Location", "http://127.0.0.1:9/elsewhere")
@@ -65,7 +67,14 @@ class _Recorder(BaseHTTPRequestHandler):
 @pytest.fixture
 def http_server(monkeypatch):
     """A local server for notification tests: `.requests`, `.status`, `.redirect`, `.url`."""
-    for name in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "all_proxy"):
+    for name in (
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "all_proxy",
+    ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("NO_PROXY", "127.0.0.1")
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Recorder)

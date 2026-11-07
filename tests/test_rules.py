@@ -74,7 +74,9 @@ def test_attack_that_continues_alerts_again_in_the_next_window(engine):
 
 
 def test_slow_attempts_outside_the_window_do_not_fire(engine):
-    alerts = [a for i in range(10) for a in engine.evaluate(ssh_fail(i * 30))]  # 1 per 30s, 5m total
+    alerts = [
+        a for i in range(10) for a in engine.evaluate(ssh_fail(i * 30))
+    ]  # 1 per 30s, 5m total
     assert "ssh-bruteforce" not in ids(alerts)
 
 
@@ -132,8 +134,14 @@ def test_regex_and_numeric_modifiers(tmp_path):
         ("id: R!\ntitle: T\nseverity: low\nmatch: {a: 1}\n", "invalid id"),
         ("id: r\ntitle: T\nseverity: low\nmatch: {'a|nope': 1}\n", "unknown modifier"),
         ("id: r\ntitle: T\nseverity: low\nmatch: {'a|re': '['}\n", "invalid regex"),
-        ("id: r\ntitle: T\nseverity: low\nmatch: {a: 1}\nthreshold: {count: 3, window: soon}\n", "invalid duration"),
-        ("id: r\ntitle: T\nseverity: low\nmatch: {a: 1}\nthreshold: {count: 0, window: 1m}\n", "positive integer"),
+        (
+            "id: r\ntitle: T\nseverity: low\nmatch: {a: 1}\nthreshold: {count: 3, window: soon}\n",
+            "invalid duration",
+        ),
+        (
+            "id: r\ntitle: T\nseverity: low\nmatch: {a: 1}\nthreshold: {count: 0, window: 1m}\n",
+            "positive integer",
+        ),
         ("- just\n- a list\n", "YAML mapping"),
     ],
 )

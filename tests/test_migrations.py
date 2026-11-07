@@ -54,8 +54,12 @@ def test_a_database_from_before_migrations_is_adopted_with_its_data(engine):
     with engine.begin() as connection:
         connection.execute(
             EventRow.__table__.insert().values(
-                ts=datetime(2026, 10, 20, 9), source="auth", host="", event_type="x",
-                raw="kept", fields={},
+                ts=datetime(2026, 10, 20, 9),
+                source="auth",
+                host="",
+                event_type="x",
+                raw="kept",
+                fields={},
             )
         )
     assert current_revision(engine) is None
@@ -85,9 +89,7 @@ def test_initial_revision_is_the_first_one():
     assert head_revision() == INITIAL_REVISION  # update INITIAL_REVISION only if history is rebuilt
 
 
-def test_the_alembic_command_line_finds_the_database_from_the_environment(
-    tmp_path, monkeypatch
-):
+def test_the_alembic_command_line_finds_the_database_from_the_environment(tmp_path, monkeypatch):
     url = f"sqlite:///{tmp_path / 'cli.db'}"
     monkeypatch.setenv("DATABASE_URL", url)
     config = Config()

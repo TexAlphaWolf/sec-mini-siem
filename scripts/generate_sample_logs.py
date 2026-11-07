@@ -29,44 +29,133 @@ def auth_lines() -> list[tuple[datetime, str]]:
     rows: list[tuple[datetime, str]] = []
 
     # Normal logins.
-    for minutes, user, ip in [(5, "alice", "192.0.2.10"), (100, "alice", "192.0.2.10"), (135, "bob", "192.0.2.11")]:
+    for minutes, user, ip in [
+        (5, "alice", "192.0.2.10"),
+        (100, "alice", "192.0.2.10"),
+        (135, "bob", "192.0.2.11"),
+    ]:
         ts = BASE + timedelta(minutes=minutes)
         port = rng.randint(40000, 60000)
-        rows.append((ts, syslog(ts, "sshd", 2100 + minutes, f"Accepted publickey for {user} from {ip} port {port} ssh2: ED25519 SHA256:xxxx")))
+        rows.append(
+            (
+                ts,
+                syslog(
+                    ts,
+                    "sshd",
+                    2100 + minutes,
+                    f"Accepted publickey for {user} from {ip} port {port} ssh2: ED25519 SHA256:xxxx",
+                ),
+            )
+        )
 
     # SSH brute force from 203.0.113.50: a dictionary of usernames, a few seconds apart.
     ts = BASE + timedelta(hours=1, minutes=12)
-    users = ["admin", "test", "oracle", "ubuntu", "pi", "postgres", "git", "deploy", "user", "guest"]
+    users = [
+        "admin",
+        "test",
+        "oracle",
+        "ubuntu",
+        "pi",
+        "postgres",
+        "git",
+        "deploy",
+        "user",
+        "guest",
+    ]
     for i in range(14):
         ts += timedelta(seconds=rng.randint(2, 4))
         user = users[i % len(users)]
         port = rng.randint(30000, 60000)
-        rows.append((ts, syslog(ts, "sshd", 3000 + i, f"Invalid user {user} from 203.0.113.50 port {port}")))
-        rows.append((ts, syslog(ts, "sshd", 3000 + i, f"Failed password for invalid user {user} from 203.0.113.50 port {port} ssh2")))
+        rows.append(
+            (ts, syslog(ts, "sshd", 3000 + i, f"Invalid user {user} from 203.0.113.50 port {port}"))
+        )
+        rows.append(
+            (
+                ts,
+                syslog(
+                    ts,
+                    "sshd",
+                    3000 + i,
+                    f"Failed password for invalid user {user} from 203.0.113.50 port {port} ssh2",
+                ),
+            )
+        )
 
     # Account guessing, then root attempts, then a root login from 198.51.100.23.
     ts = BASE + timedelta(hours=1, minutes=30)
     for user in ["test1", "backup", "support", "ftpuser"]:
         ts += timedelta(seconds=30)
-        rows.append((ts, syslog(ts, "sshd", 3300, f"Invalid user {user} from 198.51.100.23 port {rng.randint(30000, 60000)}")))
+        rows.append(
+            (
+                ts,
+                syslog(
+                    ts,
+                    "sshd",
+                    3300,
+                    f"Invalid user {user} from 198.51.100.23 port {rng.randint(30000, 60000)}",
+                ),
+            )
+        )
     for _ in range(4):
         ts += timedelta(seconds=25)
-        rows.append((ts, syslog(ts, "sshd", 3301, f"Failed password for root from 198.51.100.23 port {rng.randint(30000, 60000)} ssh2")))
+        rows.append(
+            (
+                ts,
+                syslog(
+                    ts,
+                    "sshd",
+                    3301,
+                    f"Failed password for root from 198.51.100.23 port {rng.randint(30000, 60000)} ssh2",
+                ),
+            )
+        )
     ts += timedelta(seconds=40)
-    rows.append((ts, syslog(ts, "sshd", 3302, f"Accepted password for root from 198.51.100.23 port {rng.randint(30000, 60000)} ssh2")))
+    rows.append(
+        (
+            ts,
+            syslog(
+                ts,
+                "sshd",
+                3302,
+                f"Accepted password for root from 198.51.100.23 port {rng.randint(30000, 60000)} ssh2",
+            ),
+        )
+    )
 
     # Three failed sudo attempts by bob, then a normal sudo command by alice.
     ts = BASE + timedelta(hours=2, minutes=30)
     for _ in range(3):
         ts += timedelta(minutes=2)
-        rows.append((ts, syslog(ts, "sudo", None, "    bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow")))
+        rows.append(
+            (
+                ts,
+                syslog(
+                    ts,
+                    "sudo",
+                    None,
+                    "    bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow",
+                ),
+            )
+        )
     ts += timedelta(minutes=6)
-    rows.append((ts, syslog(ts, "sudo", None, "  alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/apt update")))
+    rows.append(
+        (
+            ts,
+            syslog(
+                ts,
+                "sudo",
+                None,
+                "  alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/apt update",
+            ),
+        )
+    )
 
     return sorted(rows, key=lambda r: r[0])
 
 
-def nginx_line(ts: datetime, ip: str, method: str, path: str, status: int, size: int, ua: str) -> str:
+def nginx_line(
+    ts: datetime, ip: str, method: str, path: str, status: int, size: int, ua: str
+) -> str:
     return f'{ip} - - [{ts:%d/%b/%Y:%H:%M:%S} +0000] "{method} {path} HTTP/1.1" {status} {size} "-" "{ua}"'
 
 
@@ -75,20 +164,51 @@ def access_lines() -> list[tuple[datetime, str]]:
     browser = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 
     # Normal visitors.
-    pages = ["/", "/index.html", "/about", "/products", "/contact", "/static/app.css", "/static/app.js"]
+    pages = [
+        "/",
+        "/index.html",
+        "/about",
+        "/products",
+        "/contact",
+        "/static/app.css",
+        "/static/app.js",
+    ]
     for _ in range(90):
         ts = BASE + timedelta(seconds=rng.randint(0, 4 * 3600))
         ip = f"192.0.2.{rng.randint(20, 80)}"
         status = rng.choice([200, 200, 200, 304])
-        rows.append((ts, nginx_line(ts, ip, "GET", rng.choice(pages), status, rng.randint(300, 9000), browser)))
+        rows.append(
+            (
+                ts,
+                nginx_line(
+                    ts, ip, "GET", rng.choice(pages), status, rng.randint(300, 9000), browser
+                ),
+            )
+        )
 
     # Directory scanner from 203.0.113.77 (Nikto): many 404s plus probes for sensitive files.
     ts = BASE + timedelta(hours=1, minutes=50)
-    guesses = ["/admin", "/backup.zip", "/db.sql", "/config.php", "/test", "/old", "/login", "/.env", "/.git/config",
-               "/wp-login.php", "/phpmyadmin/", "/xmlrpc.php"]
+    guesses = [
+        "/admin",
+        "/backup.zip",
+        "/db.sql",
+        "/config.php",
+        "/test",
+        "/old",
+        "/login",
+        "/.env",
+        "/.git/config",
+        "/wp-login.php",
+        "/phpmyadmin/",
+        "/xmlrpc.php",
+    ]
     for i in range(45):
         ts += timedelta(seconds=1)
-        path = guesses[i % len(guesses)] if i % 4 == 0 else f"/{rng.choice(['a', 'b', 'c'])}{rng.randint(100, 999)}"
+        path = (
+            guesses[i % len(guesses)]
+            if i % 4 == 0
+            else f"/{rng.choice(['a', 'b', 'c'])}{rng.randint(100, 999)}"
+        )
         rows.append((ts, nginx_line(ts, "203.0.113.77", "GET", path, 404, 153, "Nikto/2.5.0")))
 
     # Injection attempts from 198.51.100.99 (sqlmap).
@@ -129,19 +249,51 @@ def journal_lines() -> list[tuple[datetime, str]]:
     """The same kinds of events as auth.log, but from a systemd host (db01)."""
     rows: list[tuple[datetime, str]] = []
     ts = BASE + timedelta(minutes=20)
-    rows.append((ts, journal_entry(ts, "sshd", 4100, "Accepted publickey for alice from 192.0.2.10 port 50122 ssh2: ED25519 SHA256:xxxx")))
+    rows.append(
+        (
+            ts,
+            journal_entry(
+                ts,
+                "sshd",
+                4100,
+                "Accepted publickey for alice from 192.0.2.10 port 50122 ssh2: ED25519 SHA256:xxxx",
+            ),
+        )
+    )
 
     # Password spraying from 203.0.113.61: one or two tries for each of many accounts.
     ts = BASE + timedelta(hours=1, minutes=5)
-    for i, user in enumerate(["admin", "deploy", "jenkins", "postgres", "backup", "grafana", "ubuntu", "git"]):
+    for i, user in enumerate(
+        ["admin", "deploy", "jenkins", "postgres", "backup", "grafana", "ubuntu", "git"]
+    ):
         ts += timedelta(seconds=rng.randint(20, 40))
         port = rng.randint(30000, 60000)
-        rows.append((ts, journal_entry(ts, "sshd", 4200 + i, f"Failed password for {user} from 203.0.113.61 port {port} ssh2")))
+        rows.append(
+            (
+                ts,
+                journal_entry(
+                    ts,
+                    "sshd",
+                    4200 + i,
+                    f"Failed password for {user} from 203.0.113.61 port {port} ssh2",
+                ),
+            )
+        )
 
     ts = BASE + timedelta(hours=2, minutes=10)
     for _ in range(3):
         ts += timedelta(minutes=1)
-        rows.append((ts, journal_entry(ts, "sudo", 4300, "    carol : 3 incorrect password attempts ; TTY=pts/2 ; PWD=/home/carol ; USER=root ; COMMAND=/usr/bin/less /var/log/syslog")))
+        rows.append(
+            (
+                ts,
+                journal_entry(
+                    ts,
+                    "sudo",
+                    4300,
+                    "    carol : 3 incorrect password attempts ; TTY=pts/2 ; PWD=/home/carol ; USER=root ; COMMAND=/usr/bin/less /var/log/syslog",
+                ),
+            )
+        )
     return sorted(rows, key=lambda r: r[0])
 
 
@@ -165,27 +317,99 @@ def windows_lines() -> list[tuple[datetime, str]]:
 
     # Everyday: the owner logs on at the console.
     ts = BASE + timedelta(minutes=2)
-    add(ts, 4624, "Security", {"TargetUserName": "luca", "TargetDomainName": "WIN-DESK01", "LogonType": "2", "IpAddress": "-", "WorkstationName": "WIN-DESK01", "AuthenticationPackageName": "Negotiate"})
+    add(
+        ts,
+        4624,
+        "Security",
+        {
+            "TargetUserName": "luca",
+            "TargetDomainName": "WIN-DESK01",
+            "LogonType": "2",
+            "IpAddress": "-",
+            "WorkstationName": "WIN-DESK01",
+            "AuthenticationPackageName": "Negotiate",
+        },
+    )
 
     # Remote Desktop brute force from 198.51.100.77: rapid failures, then a successful RDP logon.
     ts = BASE + timedelta(hours=1, minutes=40)
     for user in ["administrator", "admin", "luca", "guest", "user", "test", "support"]:
         ts += timedelta(seconds=rng.randint(3, 6))
-        add(ts, 4625, "Security", {"TargetUserName": user, "TargetDomainName": "WIN-DESK01", "LogonType": "3", "IpAddress": "198.51.100.77", "WorkstationName": "-", "Status": "0xc000006d", "SubStatus": "0xc000006a"})
+        add(
+            ts,
+            4625,
+            "Security",
+            {
+                "TargetUserName": user,
+                "TargetDomainName": "WIN-DESK01",
+                "LogonType": "3",
+                "IpAddress": "198.51.100.77",
+                "WorkstationName": "-",
+                "Status": "0xc000006d",
+                "SubStatus": "0xc000006a",
+            },
+        )
     ts += timedelta(seconds=20)
-    add(ts, 4624, "Security", {"TargetUserName": "administrator", "TargetDomainName": "WIN-DESK01", "LogonType": "10", "IpAddress": "198.51.100.77", "WorkstationName": "-", "AuthenticationPackageName": "Negotiate"})
+    add(
+        ts,
+        4624,
+        "Security",
+        {
+            "TargetUserName": "administrator",
+            "TargetDomainName": "WIN-DESK01",
+            "LogonType": "10",
+            "IpAddress": "198.51.100.77",
+            "WorkstationName": "-",
+            "AuthenticationPackageName": "Negotiate",
+        },
+    )
     ts += timedelta(seconds=2)
-    add(ts, 4672, "Security", {"SubjectUserName": "administrator", "SubjectDomainName": "WIN-DESK01"})
+    add(
+        ts,
+        4672,
+        "Security",
+        {"SubjectUserName": "administrator", "SubjectDomainName": "WIN-DESK01"},
+    )
 
     # What an intruder does next: a new account, made an administrator, a service and a task.
     ts += timedelta(minutes=3)
-    add(ts, 4720, "Security", {"TargetUserName": "support$helper", "SubjectUserName": "administrator"})
+    add(
+        ts,
+        4720,
+        "Security",
+        {"TargetUserName": "support$helper", "SubjectUserName": "administrator"},
+    )
     ts += timedelta(seconds=15)
-    add(ts, 4732, "Security", {"TargetUserName": "Administrators", "MemberName": "-", "MemberSid": "S-1-5-21-1111111111-2222222222-3333333333-1005", "SubjectUserName": "administrator"})
+    add(
+        ts,
+        4732,
+        "Security",
+        {
+            "TargetUserName": "Administrators",
+            "MemberName": "-",
+            "MemberSid": "S-1-5-21-1111111111-2222222222-3333333333-1005",
+            "SubjectUserName": "administrator",
+        },
+    )
     ts += timedelta(minutes=1)
-    add(ts, 7045, "System", {"ServiceName": "UpdateHelper", "ImageFileName": "C:\\Users\\Public\\uh.exe", "StartType": "auto start", "AccountName": "LocalSystem"})
+    add(
+        ts,
+        7045,
+        "System",
+        {
+            "ServiceName": "UpdateHelper",
+            "ImageFileName": "C:\\Users\\Public\\uh.exe",
+            "StartType": "auto start",
+            "AccountName": "LocalSystem",
+        },
+    )
     ts += timedelta(seconds=30)
-    add(ts, 4698, "Security", {"TaskName": "\\Microsoft\\Windows\\UpdateHelper", "SubjectUserName": "administrator"})
+    add(
+        ts,
+        4698,
+        "Security",
+        {"TaskName": "\\Microsoft\\Windows\\UpdateHelper", "SubjectUserName": "administrator"},
+    )
     ts += timedelta(minutes=2)
     add(ts, 1102, "Security", {})
     return sorted(rows, key=lambda r: r[0])
@@ -193,10 +417,18 @@ def windows_lines() -> list[tuple[datetime, str]]:
 
 def main() -> None:
     OUT.mkdir(exist_ok=True)
-    (OUT / "auth.log").write_text("\n".join(line for _, line in auth_lines()) + "\n", encoding="utf-8")
-    (OUT / "access.log").write_text("\n".join(line for _, line in access_lines()) + "\n", encoding="utf-8")
-    (OUT / "journal.jsonl").write_text("\n".join(line for _, line in journal_lines()) + "\n", encoding="utf-8")
-    (OUT / "windows-security.jsonl").write_text("\n".join(line for _, line in windows_lines()) + "\n", encoding="utf-8")
+    (OUT / "auth.log").write_text(
+        "\n".join(line for _, line in auth_lines()) + "\n", encoding="utf-8"
+    )
+    (OUT / "access.log").write_text(
+        "\n".join(line for _, line in access_lines()) + "\n", encoding="utf-8"
+    )
+    (OUT / "journal.jsonl").write_text(
+        "\n".join(line for _, line in journal_lines()) + "\n", encoding="utf-8"
+    )
+    (OUT / "windows-security.jsonl").write_text(
+        "\n".join(line for _, line in windows_lines()) + "\n", encoding="utf-8"
+    )
     print(f"wrote auth.log, access.log, journal.jsonl and windows-security.jsonl to {OUT}")
 
 

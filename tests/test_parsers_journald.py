@@ -26,7 +26,9 @@ def entry(message, *, sec: float = 0, ident: str = "sshd", **extra) -> str:
 
 
 def test_failed_password_is_read_like_in_auth_log():
-    e = parse_journald_line(entry("Failed password for invalid user admin from 203.0.113.50 port 4242 ssh2"))
+    e = parse_journald_line(
+        entry("Failed password for invalid user admin from 203.0.113.50 port 4242 ssh2")
+    )
     assert e is not None
     assert (e.source, e.event_type) == ("journald", "ssh_failed_password")
     assert (e.username, e.src_ip, e.host) == ("admin", "203.0.113.50", "db01")
@@ -46,7 +48,10 @@ def test_microseconds_are_kept():
 
 def test_sudo_message_with_leading_spaces():
     e = parse_journald_line(
-        entry("    bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/bin/ls", ident="sudo")
+        entry(
+            "    bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/bin/ls",
+            ident="sudo",
+        )
     )
     assert e.event_type == "sudo_failure"
     assert e.username == "bob"
@@ -95,7 +100,10 @@ def test_hostile_content_stays_data():
 
 def test_the_same_rules_fire_for_journald_events():
     engine = RuleEngine(load_rules("rules"))
-    lines = [entry(f"Failed password for admin from 203.0.113.50 port {4000 + i} ssh2", sec=i) for i in range(5)]
+    lines = [
+        entry(f"Failed password for admin from 203.0.113.50 port {4000 + i} ssh2", sec=i)
+        for i in range(5)
+    ]
     events, skipped = parse_lines("journald", lines)
     assert skipped == 0
     fired = {a.rule_id for e in events for a in engine.evaluate(e)}

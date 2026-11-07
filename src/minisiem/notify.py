@@ -357,9 +357,7 @@ def _check_url(url: str) -> None:
 def build_notifier(settings: NotifySettings, geo: GeoIP | None = None) -> Notifier | None:
     """Create the notifier for the configured channels, or None when there are none."""
     if settings.min_severity not in SEVERITIES:
-        raise ConfigError(
-            f"MINISIEM_NOTIFY_MIN_SEVERITY must be one of {', '.join(SEVERITIES)}"
-        )
+        raise ConfigError(f"MINISIEM_NOTIFY_MIN_SEVERITY must be one of {', '.join(SEVERITIES)}")
     channels: list[Channel] = []
 
     if settings.telegram_token or settings.telegram_chat_id:

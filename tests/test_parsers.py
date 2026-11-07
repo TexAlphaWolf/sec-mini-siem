@@ -14,7 +14,9 @@ def auth(line: str, **kwargs):
 
 
 def test_failed_password_for_invalid_user():
-    e = auth("Oct 20 09:12:03 web01 sshd[2211]: Failed password for invalid user admin from 203.0.113.50 port 4242 ssh2")
+    e = auth(
+        "Oct 20 09:12:03 web01 sshd[2211]: Failed password for invalid user admin from 203.0.113.50 port 4242 ssh2"
+    )
     assert e is not None
     assert e.event_type == "ssh_failed_password"
     assert e.username == "admin"
@@ -26,7 +28,9 @@ def test_failed_password_for_invalid_user():
 
 
 def test_failed_password_for_existing_user():
-    e = auth("Oct 20 09:12:03 web01 sshd[1]: Failed password for root from 198.51.100.23 port 22 ssh2")
+    e = auth(
+        "Oct 20 09:12:03 web01 sshd[1]: Failed password for root from 198.51.100.23 port 22 ssh2"
+    )
     assert e.username == "root"
     assert e.fields["invalid_user"] is False
 
@@ -34,28 +38,36 @@ def test_failed_password_for_existing_user():
 def test_invalid_user_and_accepted():
     invalid = auth("Oct 20 09:12:03 web01 sshd[1]: Invalid user test from 203.0.113.5 port 5555")
     assert invalid.event_type == "ssh_invalid_user"
-    ok = auth("Oct  5 09:12:03 web01 sshd[1]: Accepted publickey for alice from 192.0.2.10 port 51122 ssh2: ED25519 SHA256:abc")
+    ok = auth(
+        "Oct  5 09:12:03 web01 sshd[1]: Accepted publickey for alice from 192.0.2.10 port 51122 ssh2: ED25519 SHA256:abc"
+    )
     assert ok.event_type == "ssh_accepted"
     assert ok.username == "alice"
     assert ok.ts.day == 5
 
 
 def test_sudo_failure_and_command():
-    fail = auth("Oct 20 10:30:00 web01 sudo:     bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow")
+    fail = auth(
+        "Oct 20 10:30:00 web01 sudo:     bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow"
+    )
     assert fail.event_type == "sudo_failure"
     assert fail.username == "bob"
     assert fail.fields["attempts"] == 3
     assert fail.fields["command"] == "/usr/bin/cat /etc/shadow"
     assert fail.src_ip is None
 
-    ok = auth("Oct 20 10:40:00 web01 sudo:   alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/apt update")
+    ok = auth(
+        "Oct 20 10:40:00 web01 sudo:   alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/apt update"
+    )
     assert ok.event_type == "sudo_command"
     assert ok.fields["command"] == "/usr/bin/apt update"
 
 
 def test_syslog_timezone_is_converted_to_utc():
     # Europe/Rome is UTC+2 on 20 October 2026 (DST ends on the 25th).
-    e = auth("Oct 20 10:00:00 web01 sshd[1]: Invalid user x from 203.0.113.5 port 1", tz="Europe/Rome")
+    e = auth(
+        "Oct 20 10:00:00 web01 sshd[1]: Invalid user x from 203.0.113.5 port 1", tz="Europe/Rome"
+    )
     assert e.ts == datetime(2026, 10, 20, 8, 0, 0)
 
 
@@ -69,7 +81,9 @@ def test_iso_timestamp_format():
 
 def test_december_line_read_in_january_belongs_to_previous_year():
     now = datetime(2027, 1, 2, 12, 0, 0).astimezone()
-    e = parse_auth_line("Dec 31 23:59:00 web01 sshd[1]: Invalid user x from 203.0.113.5 port 1", now=now)
+    e = parse_auth_line(
+        "Dec 31 23:59:00 web01 sshd[1]: Invalid user x from 203.0.113.5 port 1", now=now
+    )
     assert e.ts.year == 2026
 
 
@@ -95,7 +109,9 @@ def test_nginx_combined_line():
 
 
 def test_nginx_garbage_request_line_is_kept():
-    e = parse_nginx_line('203.0.113.9 - - [20/Oct/2026:10:50:01 +0000] "\\x16\\x03\\x01" 400 0 "-" "-"')
+    e = parse_nginx_line(
+        '203.0.113.9 - - [20/Oct/2026:10:50:01 +0000] "\\x16\\x03\\x01" 400 0 "-" "-"'
+    )
     assert e is not None
     assert e.fields["http_method"] == ""
     assert e.fields["status"] == 400

@@ -43,8 +43,11 @@ def geo(city_db, asn_db):
 
 def test_country_city_and_network_owner(geo):
     assert geo.lookup(PUBLIC_IP) == {
-        "country_code": "US", "country": "United States", "city": "Mountain View",
-        "asn": 15169, "org": "GOOGLE",
+        "country_code": "US",
+        "country": "United States",
+        "city": "Mountain View",
+        "asn": 15169,
+        "org": "GOOGLE",
     }
 
 
@@ -59,7 +62,17 @@ def test_each_database_is_optional(city_db, asn_db):
 
 @pytest.mark.parametrize(
     "address",
-    ["203.0.113.5", "192.168.1.10", "10.0.0.1", "127.0.0.1", "::1", "9.9.9.9", "not-an-ip", "", None],
+    [
+        "203.0.113.5",
+        "192.168.1.10",
+        "10.0.0.1",
+        "127.0.0.1",
+        "::1",
+        "9.9.9.9",
+        "not-an-ip",
+        "",
+        None,
+    ],
 )
 def test_no_answer_for_private_unknown_or_invalid_addresses(geo, address):
     assert geo.lookup(address) is None
@@ -114,14 +127,19 @@ def failed_ssh(ip: str, count: int = 5) -> bytes:
 
 def post(client, ip):
     return client.post(
-        "/ingest/auth", params={"year": 2026}, content=failed_ssh(ip),
+        "/ingest/auth",
+        params={"year": 2026},
+        content=failed_ssh(ip),
         headers={"content-type": "text/plain"},
     )
 
 
 def test_alerts_and_top_sources_carry_the_country(database_url, rules_dir, city_db):
     settings = Settings(
-        database_url=database_url, rules_dir=rules_dir, log_timezone="UTC", api_token=None,
+        database_url=database_url,
+        rules_dir=rules_dir,
+        log_timezone="UTC",
+        api_token=None,
         geoip_db=city_db,
     )
     with TestClient(create_app(settings)) as client:
@@ -135,7 +153,9 @@ def test_alerts_and_top_sources_carry_the_country(database_url, rules_dir, city_
 
 
 def test_without_a_database_geo_is_null(database_url, rules_dir):
-    settings = Settings(database_url=database_url, rules_dir=rules_dir, log_timezone="UTC", api_token=None)
+    settings = Settings(
+        database_url=database_url, rules_dir=rules_dir, log_timezone="UTC", api_token=None
+    )
     with TestClient(create_app(settings)) as client:
         post(client, PUBLIC_IP)
         assert all(a["geo"] is None for a in client.get("/api/alerts").json())
@@ -143,7 +163,10 @@ def test_without_a_database_geo_is_null(database_url, rules_dir):
 
 def test_app_refuses_to_start_with_a_missing_database(database_url, rules_dir, tmp_path):
     settings = Settings(
-        database_url=database_url, rules_dir=rules_dir, log_timezone="UTC", api_token=None,
+        database_url=database_url,
+        rules_dir=rules_dir,
+        log_timezone="UTC",
+        api_token=None,
         geoip_db=tmp_path / "nope.mmdb",
     )
     with pytest.raises(ValueError, match="file not found"), TestClient(create_app(settings)):

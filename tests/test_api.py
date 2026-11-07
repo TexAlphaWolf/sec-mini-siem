@@ -8,9 +8,7 @@ from minisiem.api import STATIC_DIR, create_app
 from minisiem.config import Settings
 
 
-def make_client(
-    database_url, rules_dir, token: str | None = None, **extra
-) -> TestClient:
+def make_client(database_url, rules_dir, token: str | None = None, **extra) -> TestClient:
     settings = Settings(
         database_url=database_url,
         rules_dir=rules_dir,
@@ -106,7 +104,10 @@ def test_oversized_body_is_rejected(client, monkeypatch):
 
 def test_hostile_log_content_is_returned_as_data_not_markup(client):
     line = "Oct 20 08:00:00 web01 sshd[1]: Failed password for <script>alert(1)</script> from 203.0.113.5 port 22 ssh2"
-    assert client.post("/ingest/auth", content=line.encode(), params={"year": 2026}).json()["parsed"] == 1
+    assert (
+        client.post("/ingest/auth", content=line.encode(), params={"year": 2026}).json()["parsed"]
+        == 1
+    )
     event = client.get("/api/events").json()[0]
     assert event["username"] == "<script>alert(1)</script>"
 

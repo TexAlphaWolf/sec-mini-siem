@@ -60,9 +60,7 @@ def sudo_ok(sec, user="alice"):
 
 def web(sec, path="/", status=200, ip="203.0.113.77", ua=UA_BROWSER):
     t = _stamp(sec)
-    return (
-        f'{ip} - - [{t:%d/%b/%Y:%H:%M:%S} +0000] "GET {path} HTTP/1.1" {status} 100 "-" "{ua}"'
-    )
+    return f'{ip} - - [{t:%d/%b/%Y:%H:%M:%S} +0000] "GET {path} HTTP/1.1" {status} 100 "-" "{ua}"'
 
 
 # --- Windows event lines ----------------------------------------------------------------------
@@ -220,7 +218,9 @@ CASES: dict[str, tuple[str, dict[str, list[list[str]]]]] = {
                 [win_failed(i) for i in range(4)],
                 [win_failed(i, ip=f"198.51.100.{i + 1}") for i in range(5)],
                 [win_failed(i * 30) for i in range(5)],
-                [win_failed(i, ip="-") for i in range(10)],  # at the console: no address to group by
+                [
+                    win_failed(i, ip="-") for i in range(10)
+                ],  # at the console: no address to group by
             ],
         },
     ),

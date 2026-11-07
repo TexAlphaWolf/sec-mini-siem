@@ -93,8 +93,13 @@ def test_hostile_values_are_flattened_and_cut():
 
 @pytest.mark.parametrize(
     ("severity", "minimum", "expected"),
-    [("low", "high", False), ("medium", "high", False), ("high", "high", True),
-     ("critical", "high", True), ("low", "low", True)],
+    [
+        ("low", "high", False),
+        ("medium", "high", False),
+        ("high", "high", True),
+        ("critical", "high", True),
+        ("low", "low", True),
+    ],
 )
 def test_severity_filter(severity, minimum, expected):
     notifier = notifier_for(FakeChannel(), min_severity=minimum)
@@ -237,8 +242,15 @@ def fake_smtp(monkeypatch):
 
 
 def test_email_with_starttls_and_login(fake_smtp):
-    channel = EmailChannel("mail.example.com", 587, "siem@example.com", ["a@example.com", "b@example.com"],
-                           "starttls", "user", "pw")
+    channel = EmailChannel(
+        "mail.example.com",
+        587,
+        "siem@example.com",
+        ["a@example.com", "b@example.com"],
+        "starttls",
+        "user",
+        "pw",
+    )
     channel.send("[HIGH] Something", "body text", None)
     smtp = fake_smtp.instances[0]
     assert smtp.args == ("mail.example.com", 587)
@@ -273,8 +285,12 @@ def test_no_channel_means_no_notifier():
 
 def test_channels_are_built_from_settings():
     settings = NotifySettings(
-        telegram_token="t", telegram_chat_id="c", webhook_url="https://hooks.example.com/x",
-        smtp_host="mail", smtp_from="a@example.com", smtp_to=("b@example.com",),
+        telegram_token="t",
+        telegram_chat_id="c",
+        webhook_url="https://hooks.example.com/x",
+        smtp_host="mail",
+        smtp_from="a@example.com",
+        smtp_to=("b@example.com",),
     )
     names = [c.name for c in build_notifier(settings).channels]
     assert names == ["telegram", "webhook", "email"]
@@ -289,8 +305,16 @@ def test_channels_are_built_from_settings():
         (NotifySettings(webhook_url="not a url"), "http:// or https://"),
         (NotifySettings(webhook_url="https://x.example", webhook_format="xml"), "WEBHOOK_FORMAT"),
         (NotifySettings(smtp_host="mail"), "SMTP_FROM and MINISIEM_SMTP_TO"),
-        (NotifySettings(smtp_host="m", smtp_from="a@b.c", smtp_to=("d@e.f",), smtp_security="tls"), "SMTP_SECURITY"),
-        (NotifySettings(smtp_host="m", smtp_from="a@b.c", smtp_to=("d@e.f",), smtp_password="p"), "needs MINISIEM_SMTP_USER"),
+        (
+            NotifySettings(
+                smtp_host="m", smtp_from="a@b.c", smtp_to=("d@e.f",), smtp_security="tls"
+            ),
+            "SMTP_SECURITY",
+        ),
+        (
+            NotifySettings(smtp_host="m", smtp_from="a@b.c", smtp_to=("d@e.f",), smtp_password="p"),
+            "needs MINISIEM_SMTP_USER",
+        ),
         (NotifySettings(min_severity="urgent", webhook_url="https://x.example"), "MIN_SEVERITY"),
     ],
 )
@@ -305,7 +329,13 @@ def test_bad_notification_settings_are_rejected_with_a_clear_message(settings, m
 def recent_failed_logons(count=5) -> list[str]:
     stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     data = {"TargetUserName": "admin", "LogonType": "3", "IpAddress": "198.51.100.77"}
-    doc = {"TimeCreated": stamp, "EventID": 4625, "Computer": "WIN-DESK01", "Channel": "Security", "Data": data}
+    doc = {
+        "TimeCreated": stamp,
+        "EventID": 4625,
+        "Computer": "WIN-DESK01",
+        "Channel": "Security",
+        "Data": data,
+    }
     return [json.dumps(doc) for _ in range(count)]
 
 
@@ -328,12 +358,17 @@ def test_pipeline_sends_new_alerts_but_not_old_ones(database_url, rules_dir, sam
 
 def test_app_notifies_a_webhook_and_shuts_down_cleanly(database_url, rules_dir, http_server):
     settings = Settings(
-        database_url=database_url, rules_dir=rules_dir, log_timezone="UTC", api_token=None,
+        database_url=database_url,
+        rules_dir=rules_dir,
+        log_timezone="UTC",
+        api_token=None,
         notify=NotifySettings(webhook_url=http_server.url + "/siem"),
     )
     with TestClient(create_app(settings)) as client:
         body = "\n".join(recent_failed_logons()).encode()
-        result = client.post("/ingest/windows", content=body, headers={"content-type": "text/plain"})
+        result = client.post(
+            "/ingest/windows", content=body, headers={"content-type": "text/plain"}
+        )
         assert result.json()["alerts"] == 1
     # leaving the block stopped the app, which flushes the notification queue
     payload = json.loads(http_server.requests[0]["body"])
@@ -343,7 +378,10 @@ def test_app_notifies_a_webhook_and_shuts_down_cleanly(database_url, rules_dir, 
 
 def test_app_refuses_to_start_with_half_set_channels(database_url, rules_dir):
     settings = Settings(
-        database_url=database_url, rules_dir=rules_dir, log_timezone="UTC", api_token=None,
+        database_url=database_url,
+        rules_dir=rules_dir,
+        log_timezone="UTC",
+        api_token=None,
         notify=NotifySettings(telegram_token="only-a-token"),
     )
     with pytest.raises(ConfigError), TestClient(create_app(settings)):
@@ -403,7 +441,9 @@ def test_cli_follow_announces_new_alerts_but_a_plain_import_does_not(
     assert len(http_server.requests) == 1
 
 
-def test_cli_follow_reports_a_bad_geoip_setting(tmp_path, rules_dir, database_url, monkeypatch, capsys):
+def test_cli_follow_reports_a_bad_geoip_setting(
+    tmp_path, rules_dir, database_url, monkeypatch, capsys
+):
     log = tmp_path / "windows.jsonl"
     log.write_text("", encoding="utf-8")
     monkeypatch.setenv("DATABASE_URL", database_url)

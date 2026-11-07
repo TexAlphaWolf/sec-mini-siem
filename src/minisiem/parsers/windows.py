@@ -57,9 +57,12 @@ def _logon(event_type: str) -> Callable[[dict[str, str]], Classified]:
 
 
 def _privileged_logon(data: dict[str, str]) -> Classified:
-    return "win_privileged_logon", _get(data, "SubjectUserName"), None, {
-        "domain": _get(data, "SubjectDomainName")
-    }
+    return (
+        "win_privileged_logon",
+        _get(data, "SubjectUserName"),
+        None,
+        {"domain": _get(data, "SubjectDomainName")},
+    )
 
 
 def _user_created(data: dict[str, str]) -> Classified:

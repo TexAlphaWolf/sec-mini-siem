@@ -86,5 +86,3 @@ def parse_journald_line(
         raw=line,
         fields=fields,
     )
-
-

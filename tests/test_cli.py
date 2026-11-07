@@ -14,7 +14,9 @@ def test_rules_check_ok(rules_dir, capsys):
 
 
 def test_rules_check_reports_errors(tmp_path, capsys):
-    (tmp_path / "bad.yml").write_text("id: x\ntitle: T\nseverity: nope\nmatch: {a: 1}\n", encoding="utf-8")
+    (tmp_path / "bad.yml").write_text(
+        "id: x\ntitle: T\nseverity: nope\nmatch: {a: 1}\n", encoding="utf-8"
+    )
     assert main(["rules", "check", str(tmp_path)]) == 1
     assert "invalid severity" in capsys.readouterr().err
 

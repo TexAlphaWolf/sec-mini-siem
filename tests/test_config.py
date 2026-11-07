@@ -6,13 +6,31 @@ from sqlalchemy.engine import make_url
 from minisiem.config import ConfigError, load_settings
 
 DB_VARS = (
-    "DATABASE_URL", "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD",
-    "POSTGRES_DB", "MINISIEM_RETENTION_DAYS", "MINISIEM_READ_TOKEN", "MINISIEM_GEOIP_DB",
-    "MINISIEM_GEOIP_ASN_DB", "MINISIEM_NOTIFY_MIN_SEVERITY", "MINISIEM_NOTIFY_MAX_AGE_MINUTES",
-    "MINISIEM_NOTIFY_MAX_PER_MINUTE", "MINISIEM_TELEGRAM_TOKEN", "MINISIEM_TELEGRAM_CHAT_ID",
-    "MINISIEM_WEBHOOK_URL", "MINISIEM_WEBHOOK_TOKEN", "MINISIEM_WEBHOOK_FORMAT",
-    "MINISIEM_SMTP_HOST", "MINISIEM_SMTP_PORT", "MINISIEM_SMTP_SECURITY", "MINISIEM_SMTP_USER",
-    "MINISIEM_SMTP_PASSWORD", "MINISIEM_SMTP_FROM", "MINISIEM_SMTP_TO",
+    "DATABASE_URL",
+    "POSTGRES_HOST",
+    "POSTGRES_PORT",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DB",
+    "MINISIEM_RETENTION_DAYS",
+    "MINISIEM_READ_TOKEN",
+    "MINISIEM_GEOIP_DB",
+    "MINISIEM_GEOIP_ASN_DB",
+    "MINISIEM_NOTIFY_MIN_SEVERITY",
+    "MINISIEM_NOTIFY_MAX_AGE_MINUTES",
+    "MINISIEM_NOTIFY_MAX_PER_MINUTE",
+    "MINISIEM_TELEGRAM_TOKEN",
+    "MINISIEM_TELEGRAM_CHAT_ID",
+    "MINISIEM_WEBHOOK_URL",
+    "MINISIEM_WEBHOOK_TOKEN",
+    "MINISIEM_WEBHOOK_FORMAT",
+    "MINISIEM_SMTP_HOST",
+    "MINISIEM_SMTP_PORT",
+    "MINISIEM_SMTP_SECURITY",
+    "MINISIEM_SMTP_USER",
+    "MINISIEM_SMTP_PASSWORD",
+    "MINISIEM_SMTP_FROM",
+    "MINISIEM_SMTP_TO",
 )
 
 
@@ -65,11 +83,16 @@ def test_notification_defaults_send_nothing():
 
 def test_notification_settings_are_read_from_the_environment(monkeypatch):
     values = {
-        "MINISIEM_NOTIFY_MIN_SEVERITY": "Medium", "MINISIEM_TELEGRAM_TOKEN": " tok ",
-        "MINISIEM_TELEGRAM_CHAT_ID": "42", "MINISIEM_WEBHOOK_URL": "https://h.example/x",
-        "MINISIEM_WEBHOOK_FORMAT": "Discord", "MINISIEM_SMTP_HOST": "mail",
-        "MINISIEM_SMTP_PORT": "465", "MINISIEM_SMTP_SECURITY": "SSL",
-        "MINISIEM_SMTP_FROM": "a@example.com", "MINISIEM_SMTP_TO": "b@example.com, c@example.com,",
+        "MINISIEM_NOTIFY_MIN_SEVERITY": "Medium",
+        "MINISIEM_TELEGRAM_TOKEN": " tok ",
+        "MINISIEM_TELEGRAM_CHAT_ID": "42",
+        "MINISIEM_WEBHOOK_URL": "https://h.example/x",
+        "MINISIEM_WEBHOOK_FORMAT": "Discord",
+        "MINISIEM_SMTP_HOST": "mail",
+        "MINISIEM_SMTP_PORT": "465",
+        "MINISIEM_SMTP_SECURITY": "SSL",
+        "MINISIEM_SMTP_FROM": "a@example.com",
+        "MINISIEM_SMTP_TO": "b@example.com, c@example.com,",
     }
     for name, value in values.items():
         monkeypatch.setenv(name, value)
@@ -82,8 +105,11 @@ def test_notification_settings_are_read_from_the_environment(monkeypatch):
 
 @pytest.mark.parametrize(
     ("name", "value"),
-    [("MINISIEM_SMTP_PORT", "abc"), ("MINISIEM_NOTIFY_MAX_PER_MINUTE", "0"),
-     ("MINISIEM_NOTIFY_MAX_AGE_MINUTES", "-1")],
+    [
+        ("MINISIEM_SMTP_PORT", "abc"),
+        ("MINISIEM_NOTIFY_MAX_PER_MINUTE", "0"),
+        ("MINISIEM_NOTIFY_MAX_AGE_MINUTES", "-1"),
+    ],
 )
 def test_invalid_numbers_name_the_setting(monkeypatch, name, value):
     monkeypatch.setenv(name, value)

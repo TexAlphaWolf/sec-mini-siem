@@ -25,8 +25,17 @@ def record(event_id, data=None, channel="Security", **extra) -> str:
 
 def test_failed_logon():
     e = parse_windows_line(
-        record(4625, {"TargetUserName": "alice", "LogonType": "3", "IpAddress": "198.51.100.77",
-                      "Status": "0xc000006d", "SubStatus": "0xc000006a", "WorkstationName": "-"})
+        record(
+            4625,
+            {
+                "TargetUserName": "alice",
+                "LogonType": "3",
+                "IpAddress": "198.51.100.77",
+                "Status": "0xc000006d",
+                "SubStatus": "0xc000006a",
+                "WorkstationName": "-",
+            },
+        )
     )
     assert (e.source, e.event_type) == ("windows", "win_logon_failed")
     assert (e.username, e.src_ip, e.host) == ("alice", "198.51.100.77", "WIN-DESK01")
@@ -38,9 +47,13 @@ def test_failed_logon():
 
 
 def test_successful_rdp_logon_and_local_logon_without_an_address():
-    rdp = parse_windows_line(record(4624, {"TargetUserName": "bob", "LogonType": "10", "IpAddress": "192.0.2.9"}))
+    rdp = parse_windows_line(
+        record(4624, {"TargetUserName": "bob", "LogonType": "10", "IpAddress": "192.0.2.9"})
+    )
     assert rdp.event_type == "win_logon_success" and rdp.fields["logon_type"] == 10
-    local = parse_windows_line(record(4624, {"TargetUserName": "bob", "LogonType": "2", "IpAddress": "-"}))
+    local = parse_windows_line(
+        record(4624, {"TargetUserName": "bob", "LogonType": "2", "IpAddress": "-"})
+    )
     assert local.src_ip is None
 
 
@@ -50,10 +63,25 @@ def test_ipv6_addresses_are_normalised():
 
 
 def test_account_and_group_events():
-    created = parse_windows_line(record(4720, {"TargetUserName": "newuser", "SubjectUserName": "admin"}))
-    assert (created.event_type, created.username, created.fields["created_by"]) == ("win_user_created", "newuser", "admin")
+    created = parse_windows_line(
+        record(4720, {"TargetUserName": "newuser", "SubjectUserName": "admin"})
+    )
+    assert (created.event_type, created.username, created.fields["created_by"]) == (
+        "win_user_created",
+        "newuser",
+        "admin",
+    )
     for event_id in (4728, 4732, 4756):
-        added = parse_windows_line(record(event_id, {"TargetUserName": "Administrators", "SubjectUserName": "admin", "MemberSid": "S-1-5-21-1"}))
+        added = parse_windows_line(
+            record(
+                event_id,
+                {
+                    "TargetUserName": "Administrators",
+                    "SubjectUserName": "admin",
+                    "MemberSid": "S-1-5-21-1",
+                },
+            )
+        )
         assert added.event_type == "win_group_member_added"
         assert added.fields["group"] == "Administrators"
         assert added.username == "admin"
@@ -61,12 +89,22 @@ def test_account_and_group_events():
 
 def test_persistence_and_cleanup_events():
     service = parse_windows_line(
-        record(7045, {"ServiceName": "Updater", "ImageFileName": "C:\\Users\\Public\\u.exe", "AccountName": "LocalSystem"}, channel="System")
+        record(
+            7045,
+            {
+                "ServiceName": "Updater",
+                "ImageFileName": "C:\\Users\\Public\\u.exe",
+                "AccountName": "LocalSystem",
+            },
+            channel="System",
+        )
     )
     assert service.event_type == "win_service_installed"
     assert service.fields["image_path"] == "C:\\Users\\Public\\u.exe"
     task = parse_windows_line(record(4698, {"TaskName": "\\Updater", "SubjectUserName": "admin"}))
-    assert task.event_type == "win_scheduled_task_created" and task.fields["task_name"] == "\\Updater"
+    assert (
+        task.event_type == "win_scheduled_task_created" and task.fields["task_name"] == "\\Updater"
+    )
     for event_id in (1102, 104):
         assert parse_windows_line(record(event_id)).event_type == "win_audit_log_cleared"
 
@@ -77,17 +115,28 @@ def test_privileged_logon():
 
 
 def test_winlogbeat_layout():
-    line = json.dumps({
-        "@timestamp": "2026-10-20T09:12:03.123Z",
-        "winlog": {
-            "event_id": "4625",
-            "computer_name": "srv01",
-            "channel": "Security",
-            "event_data": {"TargetUserName": "alice", "IpAddress": "203.0.113.9", "LogonType": "10"},
-        },
-    })
+    line = json.dumps(
+        {
+            "@timestamp": "2026-10-20T09:12:03.123Z",
+            "winlog": {
+                "event_id": "4625",
+                "computer_name": "srv01",
+                "channel": "Security",
+                "event_data": {
+                    "TargetUserName": "alice",
+                    "IpAddress": "203.0.113.9",
+                    "LogonType": "10",
+                },
+            },
+        }
+    )
     e = parse_windows_line(line)
-    assert (e.event_type, e.host, e.src_ip, e.fields["logon_type"]) == ("win_logon_failed", "srv01", "203.0.113.9", 10)
+    assert (e.event_type, e.host, e.src_ip, e.fields["logon_type"]) == (
+        "win_logon_failed",
+        "srv01",
+        "203.0.113.9",
+        10,
+    )
 
 
 def test_a_utf8_bom_from_powershell_5_is_ignored():
@@ -125,5 +174,7 @@ def test_an_invalid_address_never_becomes_a_source_ip(bad_ip):
 
 
 def test_nested_values_in_event_data_are_dropped():
-    e = parse_windows_line(record(4625, {"TargetUserName": {"evil": "object"}, "IpAddress": "192.0.2.1"}))
+    e = parse_windows_line(
+        record(4625, {"TargetUserName": {"evil": "object"}, "IpAddress": "192.0.2.1"})
+    )
     assert e.username is None and e.src_ip == "192.0.2.1"
